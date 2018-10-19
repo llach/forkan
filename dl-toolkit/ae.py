@@ -90,7 +90,7 @@ class DenseAE(object):
 if __name__ == '__main__':
 
     # load dataset
-    (x_train, y_train), (x_test, y_test) = load_mnist()
+    (x_train, y_train), (x_test, y_test) = load_mnist(flatten=True)
 
     ae = DenseAE(x_train.shape[1], 10)
     ae.compile()

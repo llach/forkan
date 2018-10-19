@@ -99,7 +99,7 @@ class DenseVAE(object):
         # by default, random_normal has mean=0 and std=1.0
         epsilon = K.random_normal(shape=(batch, dim))
 
-        # finally, compute the z value
+        # finally, compute the z value *** is .5 in exp needed?
         return z_mean + K.exp(z_log_var) * epsilon # examples had .5 in exp
 
     def compile(self, optimizer='adam'):
@@ -117,7 +117,7 @@ class DenseVAE(object):
         # register loss function
         self.vae.add_loss(self.vae_loss)
 
-        # compile entire auto encoder *** is .5 in exp needed?
+        # compile entire auto encoder
         self.vae.compile(optimizer, metrics=['accuracy'])
 
     def fit(self, train, test, epochs=50, batch_size=128):
@@ -139,7 +139,7 @@ class DenseVAE(object):
 if __name__ == '__main__':
 
     # load dataset
-    (x_train, y_train), (x_test, y_test) = load_mnist()
+    (x_train, y_train), (x_test, y_test) = load_mnist(flatten=True)
 
     vae = DenseVAE(x_train.shape[1], 2, beta=1)
     vae.compile()
