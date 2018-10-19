@@ -127,11 +127,12 @@ class DenseVAE(object):
         test = prune_dataset(test, batch_size)
 
         # define tensorboard callback
-        tb = TensorBoard(log_dir='/tmp/graph', histogram_freq=0,
-          write_graph=True, write_images=True)
+        tb = TensorBoard(log_dir='/tmp/graph', histogram_freq=0, batch_size=batch_size,
+                         write_graph=True, write_images=True, update_freq=1000)
 
         # train vae
-        self.vae.fit(train, epochs=epochs, batch_size=batch_size, validation_data=(test, None))
+        self.vae.fit(train, epochs=epochs, batch_size=batch_size,
+                     validation_data=(test, None), callbacks=[tb])
 
 
 # simple test using MNIST dataset
