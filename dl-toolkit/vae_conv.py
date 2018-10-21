@@ -1,13 +1,15 @@
 from __future__ import absolute_import
 
 import tensorflow as tf
-from tensorflow.python import debug as tf_debug
+import time
 
 from keras import Model
 from keras.initializers import Constant
 from keras.callbacks import TensorBoard
 from keras.losses import binary_crossentropy
-from keras.layers import Conv2D, Conv2DTranspose, Dense, Input, Lambda, Flatten, Reshape
+from keras.layers import Conv2D, Conv2DTranspose, Dense, Input, Lambda
+from keras.layers import Flatten, Reshape, MaxPool2D, UpSampling2D, BatchNormalization
+from keras.layers.advanced_activations import LeakyReLU
 from keras.utils import plot_model
 from keras import backend as K
 
@@ -17,28 +19,64 @@ from utils import load_mnist, prune_dataset, plot_ae_mnist_results
 class ConvVAE(object):
 
     def __init__(self, input_shape, latent_dim, kernel_size=3, initial_bias=.1,
-                filters=32, strides=2, beta=1., debug=False, plot_models=False):
+                filters=32, strides=2, beta=1., debug=False, plot_models=False,
+                activation='relu', batch_norm=False, pooling=False):
 
         # define encoder input layer
         self.inputs = Input(shape=input_shape)
 
+        # we need to check for special case leaky relu
+        if activation == 'leaky':
+            self.layer_activation = 'linear'
+            self.activation = 'leaky'
+        else:
+            self.layer_activation = self.activation = activation
+
+        # for pooling, we need strides of 1 in conv layers
+        if pooling:
+            strides = 1
+
         # prepare encoder
-        x = Conv2D(filters, kernel_size, strides=2, padding='same',
-                   data_format='channels_last', activation='relu',
+        x = Conv2D(filters, kernel_size, strides=strides, padding='same',
+                   data_format='channels_last', activation=self.layer_activation,
                    bias_initializer=Constant(initial_bias),
                    name='enc-conv-1')(self.inputs)
 
-        x = Conv2D((filters*2), kernel_size, strides=2, padding='same',
-                   data_format='channels_last', activation='relu',
+        if self.activation == 'leaky':
+            x = LeakyReLU()(x)
+
+        if batch_norm:
+            x = BatchNormalization()(x)
+
+        if pooling:
+            x = MaxPool2D(strides=(2, 2))(x)
+
+        x = Conv2D((filters*2), kernel_size, strides=strides, padding='same',
+                   data_format='channels_last', activation=self.layer_activation,
                    bias_initializer=Constant(initial_bias),
                    name='enc-conv-2')(x)
+
+        if self.activation == 'leaky':
+            x = LeakyReLU()(x)
+
+        if batch_norm:
+            x = BatchNormalization()(x)
+
+        if pooling:
+            x = MaxPool2D(strides=(2, 2))(x)
 
         # shape info needed to build decoder model
         conv_shape = K.int_shape(x)
 
         x = Flatten()(x)
-        x = Dense(25, activation='relu', bias_initializer=Constant(initial_bias),
+        x = Dense(200, activation=self.layer_activation, bias_initializer=Constant(initial_bias),
                   name='enc-dense')(x)
+
+        if self.activation == 'leaky':
+            x = LeakyReLU()(x)
+
+        if batch_norm:
+            x = BatchNormalization()(x)
 
         # latent variables means and log(standard deviation)
         # leave the z activations linear!
@@ -52,20 +90,45 @@ class ConvVAE(object):
         # define decoder input layer
         self.de_inputs = Input(shape=(latent_dim,))
 
-        x = Dense(conv_shape[1] * conv_shape[2] * conv_shape[3], activation='relu',
+        x = Dense(conv_shape[1] * conv_shape[2] * conv_shape[3], activation=self.layer_activation,
                   bias_initializer=Constant(initial_bias), name='dec-dense')(self.de_inputs)
+
+        if self.activation == 'leaky':
+            x = LeakyReLU()(x)
+
+        if batch_norm:
+            x = BatchNormalization()(x)
+
         x = Reshape((conv_shape[1], conv_shape[2], conv_shape[3]))(x)
+
+        if pooling:
+            x = UpSampling2D((2, 2))(x)
 
         # prepare decoder
         x = Conv2DTranspose(filters*2, kernel_size, strides=strides, padding='same',
-                           data_format='channels_last', activation='relu',
+                           data_format='channels_last', activation=self.layer_activation,
                            bias_initializer=Constant(initial_bias),
-                           name='dev-conv-1')(x)
+                           name='dev-convT-1')(x)
+
+        if self.activation == 'leaky':
+            x = LeakyReLU()(x)
+
+        if batch_norm:
+            x = BatchNormalization()(x)
+
+        if pooling:
+            x = UpSampling2D((2, 2))(x)
 
         x = Conv2DTranspose(filters, kernel_size, strides=strides, padding='same',
-                            data_format='channels_last', activation='relu',
+                            data_format='channels_last', activation=self.layer_activation,
                             bias_initializer=Constant(initial_bias),
-                            name='dev-conv-2')(x)
+                            name='dev-convT-2')(x)
+
+        if self.activation == 'leaky':
+            x = LeakyReLU()(x)
+
+        if batch_norm:
+            x = BatchNormalization()(x)
 
         # this one is mainly to normalize outputs
         x = Conv2DTranspose(1, kernel_size, strides=1, padding='same',
@@ -107,6 +170,7 @@ class ConvVAE(object):
                        show_shapes=True)
 
         if debug:
+            from tensorflow.python import debug as tf_debug
             K.set_session(
                 tf_debug.TensorBoardDebugWrapperSession(tf.Session(), 'localhost:7000'))
 
@@ -156,9 +220,11 @@ class ConvVAE(object):
                          write_graph=True, write_images=True, update_freq=1000)
 
         # train vae
+        start = time.time()
         self.vae.fit(train, epochs=epochs, batch_size=batch_size,
                      validation_data=(test, None), callbacks=[tb])
-
+        end = time.time()
+        print('Training took {}.'.format(end-start))
 
 # simple test using MNIST dataset
 if __name__ == '__main__':
@@ -169,8 +235,8 @@ if __name__ == '__main__':
     image_size = x_train.shape[1]
     channels = x_train.shape[3]
 
-    vae = ConvVAE((image_size, image_size, channels), 2, beta=1)
+    vae = ConvVAE((image_size, image_size, channels), 2)
     vae.compile()
-    vae.fit(x_train, x_test, epochs=5)
+    vae.fit(x_train, x_test, epochs=10)
 
     plot_ae_mnist_results((vae.encoder, vae.decoder), (x_test, y_test))
