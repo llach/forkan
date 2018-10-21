@@ -2,7 +2,10 @@ from tensorflow.keras.datasets import mnist
 
 import numpy as np
 import matplotlib.pyplot as plt
+import math
+import sys
 import os
+
 
 def load_mnist(flatten=False):
     # load dataset
@@ -34,6 +37,55 @@ def load_mnist(flatten=False):
 
     return (x_train, y_train), (x_test, y_test)
 
+
+def load_dsprites(size=-1, validation_set=None):
+    dataset_file = os.environ['HOME'] + '/.keras/datasets/dsprites.npz'
+
+    try:
+        dataset_zip = np.load(dataset_file, encoding='latin1')
+    except:
+        print('Could not find {}. Exiting.'.format(dataset_file))
+        sys.exit(1)
+
+    imgs = dataset_zip['imgs']
+    metadata = dataset_zip['metadata'][()]
+    dataset_size = np.prod(metadata['latents_sizes'], axis=0)
+
+    assert dataset_size >= size
+    assert validation_set >= 0.0
+    assert validation_set <= 1.0
+
+    # Define number of values per latents and functions to convert to indices
+    latents_sizes = metadata['latents_sizes']
+    latents_bases = np.concatenate((latents_sizes[::-1].cumprod()[::-1][1:],
+                                    np.array([1, ])))
+
+    def latent_to_index(latents):
+        return np.dot(latents, latents_bases).astype(int)
+
+    def sample_latent(size=1):
+        samples = np.zeros((size, latents_sizes.size))
+        for lat_i, lat_size in enumerate(latents_sizes):
+            samples[:, lat_i] = np.random.randint(lat_size, size=size)
+
+        return samples
+
+    if size != -1:
+        # Sample latents randomly
+        latents_sampled = sample_latent(size=size)
+
+        # Select images
+        indices_sampled = latent_to_index(latents_sampled)
+        imgs = dataset_zip['imgs'][indices_sampled]
+        dataset_size = imgs.shape[0]
+
+    if validation_set == None:
+        return (imgs, None   )
+    else:
+        cut = math.floor(dataset_size * validation_set)
+        return(imgs[cut:], imgs[:cut])
+
+
 def prune_dataset(set, batch_size):
 
     # keras training will die if there is a smaller batch at the end
@@ -42,6 +94,7 @@ def prune_dataset(set, batch_size):
         set = set[:-rest, ]
 
     return set
+
 
 def plot_ae_mnist_results(models,
                  data,
