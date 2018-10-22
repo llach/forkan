@@ -38,28 +38,46 @@ def load_mnist(flatten=False):
     return (x_train, y_train), (x_test, y_test)
 
 
-def load_dsprites(size=-1, validation_set=None):
+def load_dsprites(size=-1, validation_set=None, format='channels_last'):
     dataset_file = os.environ['HOME'] + '/.keras/datasets/dsprites.npz'
 
+    # try to load dataset
     try:
         dataset_zip = np.load(dataset_file, encoding='latin1')
     except:
         print('Could not find {}. Exiting.'.format(dataset_file))
         sys.exit(1)
 
+    # get images, metadata and size
     imgs = dataset_zip['imgs']
     metadata = dataset_zip['metadata'][()]
     dataset_size = np.prod(metadata['latents_sizes'], axis=0)
 
+    # image dimension
+    isize = imgs.shape[1]
+
+    # dataset size
+    dsize = np.prod(metadata['latents_sizes'], axis=0)
+
+    # reshape dataset
+    if format == 'channels_last':
+        imgs = np.reshape(imgs, (dsize, isize, isize, 1))
+    else:
+        imgs = np.reshape(imgs, (dsize, 1, isize, isize))
+
+    # simple sanity checks for size and percentage ranges
     assert dataset_size >= size
-    assert validation_set >= 0.0
-    assert validation_set <= 1.0
+
+    if validation_set is not None:
+        assert validation_set >= 0.0
+        assert validation_set <= 1.0
 
     # Define number of values per latents and functions to convert to indices
     latents_sizes = metadata['latents_sizes']
     latents_bases = np.concatenate((latents_sizes[::-1].cumprod()[::-1][1:],
                                     np.array([1, ])))
 
+    # functions for random sampling copied from official repo
     def latent_to_index(latents):
         return np.dot(latents, latents_bases).astype(int)
 
@@ -70,6 +88,7 @@ def load_dsprites(size=-1, validation_set=None):
 
         return samples
 
+    # sample subset
     if size != -1:
         # Sample latents randomly
         latents_sampled = sample_latent(size=size)
