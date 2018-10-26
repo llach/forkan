@@ -2,9 +2,13 @@ from __future__ import absolute_import
 
 import tensorflow as tf
 import numpy as np
+import argparse
 import time
+import sys
+import os
 
 from keras import Model
+from datetime import datetime
 from keras.initializers import Constant
 from keras.callbacks import TensorBoard, Callback
 from keras.losses import binary_crossentropy
@@ -196,7 +200,7 @@ class bVAE(object):
         # compile entire auto encoder
         self.vae.compile(optimizer, metrics=['accuracy'])
 
-    def fit(self, train, val=None, epochs=50, batch_size=128):
+    def fit(self, train, val=None, epochs=50, batch_size=128, savefile=None):
 
         # prune datasets to avoid error
         train = prune_dataset(train, batch_size)
@@ -220,9 +224,17 @@ class bVAE(object):
         end = time.time()
         print('Training took {}.'.format(end-start))
 
+        if savefile is not None:
+            dest = os.environ['HOME'] + '/' + savefile + '.h5'
+            self.vae.save_weights(dest, overwrite=True)
+
 
 # simple test using dsprites dataset
 if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--save', type=str, default=None)
+    args = parser.parse_args()
 
     # load data
     x_train, _ = load_dsprites_translational(repetitions=5)
@@ -231,7 +243,7 @@ if __name__ == '__main__':
     # get image size
     image_size = x_train.shape[1]
 
-    vae = bVAE((image_size, image_size, 1), latent_dim=5, beta=20)
+    vae = bVAE((image_size, image_size, 1), latent_dim=5, beta=4)
     vae.compile()
-    vae.fit(x_train, val=x_val, epochs=75)
+    vae.fit(x_train, val=x_val, epochs=100, savefile=args.save)
 
