@@ -189,7 +189,7 @@ class ConvVAE(object):
         epsilon = K.random_normal(shape=(batch, dim))
 
         # finally, compute the z value
-        return z_mean + K.exp(z_log_var) * epsilon # examples had .5 in exp
+        return z_mean + K.exp(0.5 * z_log_var) * epsilon
 
     def compile(self, optimizer='adam'):
 
@@ -206,7 +206,7 @@ class ConvVAE(object):
         # register loss function
         self.vae.add_loss(self.vae_loss)
 
-        # compile entire auto encoder *** is .5 in exp needed?
+        # compile entire auto encoder
         self.vae.compile(optimizer, metrics=['accuracy'])
 
     def fit(self, train, test, epochs=50, batch_size=128):
@@ -237,6 +237,6 @@ if __name__ == '__main__':
 
     vae = ConvVAE((image_size, image_size, channels), 2)
     vae.compile()
-    vae.fit(x_train, x_test, epochs=10)
-
-    plot_ae_mnist_results((vae.encoder, vae.decoder), (x_test, y_test))
+    # vae.fit(x_train, x_test, epochs=10)
+    #
+    # plot_ae_mnist_results((vae.encoder, vae.decoder), (x_test, y_test))

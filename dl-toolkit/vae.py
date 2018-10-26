@@ -99,8 +99,8 @@ class DenseVAE(object):
         # by default, random_normal has mean=0 and std=1.0
         epsilon = K.random_normal(shape=(batch, dim))
 
-        # finally, compute the z value *** is .5 in exp needed?
-        return z_mean + K.exp(z_log_var) * epsilon # examples had .5 in exp
+        # finally, compute the z value
+        return z_mean + K.exp(0.5 * z_log_var) * epsilon
 
     def compile(self, optimizer='adam'):
 
