@@ -149,6 +149,62 @@ def load_dsprites(size=-1, validation_set=None, format='channels_last'):
         return(imgs[cut:], imgs[:cut])
 
 
+def load_dsprites_one_fixed(size=32):
+    dataset_file = os.environ['HOME'] + '/.keras/datasets/dsprites.npz'
+
+    # try to load dataset
+    try:
+        dataset_zip = np.load(dataset_file, encoding='latin1')
+    except:
+        print('Could not find {}. Exiting.'.format(dataset_file))
+        sys.exit(1)
+
+    # get images, metadata and size
+    imgs = dataset_zip['imgs']
+    metadata = dataset_zip['metadata'][()]
+    dataset_size = np.prod(metadata['latents_sizes'], axis=0)
+
+    # image dimension
+    isize = imgs.shape[1]
+
+    # dataset size
+    dsize = np.prod(metadata['latents_sizes'], axis=0)
+
+    imgs = np.reshape(imgs, (dsize, isize, isize, 1))
+
+    # Define number of values per latents and functions to convert to indices
+    latents_sizes = metadata['latents_sizes']
+    latents_bases = np.concatenate((latents_sizes[::-1].cumprod()[::-1][1:],
+                                    np.array([1, ])))
+
+    # functions for random sampling copied from official repo
+    def latent_to_index(latents):
+        return np.dot(latents, latents_bases).astype(int)
+
+    def sample_latent(size=1):
+        samples = np.zeros((size, latents_sizes.size))
+        for lat_i, lat_size in enumerate(latents_sizes):
+            samples[:, lat_i] = np.random.randint(lat_size, size=size)
+
+        return samples
+
+    ## Fix posX latent to left
+    ## sample from github for randomness in other factors
+    # latents_sampled = sample_latent(size=5000)
+    # latents_sampled[:, -2] = 0
+    # indices_sampled = latent_to_index(latents_sampled)
+    # imgs_sampled = imgs[indices_sampled]
+
+
+    # extract only translational latents
+    latents = []
+    for x in range(32):
+                latents += [[0, 0, 0, 0, x, 0]]
+
+    imgs_sampled = imgs[latent_to_index(latents)]
+
+    return imgs_sampled[:32]
+
 def load_dsprites_duo(format='channels_last', validation_set=None):
     dataset_file = os.environ['HOME'] + '/.keras/datasets/dsprites_duo.npz'
 
