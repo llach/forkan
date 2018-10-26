@@ -4,7 +4,6 @@ import os
 
 from scipy.ndimage.measurements import label
 
-from utils import animate_greyscale_dataset
 
 def generate_dsprites_duo(data_format='channels_last'):
 
@@ -86,5 +85,62 @@ def generate_dsprites_duo(data_format='channels_last'):
 
     print('Done.')
 
+
+def generate_dsprites_translational(data_format='channels_last', with_scale=False):
+
+    dataset_file = os.environ['HOME'] + '/.keras/datasets/dsprites.npz'
+
+    if not with_scale:
+        dataset_dest = os.environ['HOME'] + '/.keras/datasets/dsprites_translational.npz'
+    else:
+        dataset_dest = os.environ['HOME'] + '/.keras/datasets/dsprites_trans_scale.npz'
+
+    # try to load dataset
+    try:
+        print('Loading original dataset ...')
+        dataset_zip = np.load(dataset_file, encoding='latin1')
+    except:
+        print('Could not find {}. Exiting.'.format(dataset_file))
+        sys.exit(1)
+
+    # get images, metadata and size
+    imgs = dataset_zip['imgs']
+    metadata = dataset_zip['metadata'][()]
+    dataset_size = np.prod(metadata['latents_sizes'], axis=0)
+
+    # image dimension
+    idim = imgs.shape[1]
+
+    # Define number of values per latents and functions to convert to indices
+    latents_sizes = metadata['latents_sizes']
+    latents_bases = np.concatenate((latents_sizes[::-1].cumprod()[::-1][1:],
+                                    np.array([1, ])))
+
+    # functions for random sampling copied from official repo
+    def latent_to_index(latents):
+        return np.dot(latents, latents_bases).astype(int)
+
+    print('Generating new dataset ...')
+
+    # extract only translational latents
+    latents = []
+    for shape in range(3):
+        for scale in range(6):
+            for x in range(32):
+                for y in range(32):
+                        latents += [[0, shape, scale, 0, x, y]]
+            if not with_scale:
+                break
+
+    trans = imgs[latent_to_index(latents)]
+
+    print('Successfully generated new dataset containing {} samples.\nSaving ...'.format(len(trans)))
+
+    # saving dataset
+    with open(dataset_dest, 'wb') as file:
+        np.savez_compressed(file, data=trans)
+
+    print('Done.')
+
 if __name__ == '__main__':
-    generate_dsprites_duo()
+    generate_dsprites_translational(with_scale=True)

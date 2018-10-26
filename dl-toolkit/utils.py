@@ -1,10 +1,54 @@
-from tensorflow.keras.datasets import mnist
-
 import numpy as np
 import matplotlib.pyplot as plt
 import math
 import sys
 import os
+
+from tensorflow.keras.datasets import mnist
+from transform_dsprites import generate_dsprites_duo, generate_dsprites_translational
+
+
+def animate_greyscale_dataset(dataset):
+    '''
+    Animates dataset using matplotlib.
+    Animations get slower over time. (Beware of big datasets!)
+
+    :param dataset: dataset to animate
+    '''
+
+    # reshape if necessary
+    if len(dataset.shape) and dataset.shape[-1] == 1:
+        dataset = np.reshape(dataset, dataset.shape[:3])
+
+    for i in range(dataset.shape[0]):
+        plt.imshow(dataset[i], cmap='Greys_r')
+        plt.pause(.005)
+
+    plt.show()
+
+
+def show_density(imgs):
+  _, ax = plt.subplots()
+  ax.imshow(imgs.mean(axis=0), interpolation='nearest', cmap='Greys_r')
+  ax.grid('off')
+  ax.set_xticks([])
+  ax.set_yticks([])
+
+
+# Helper function to show images
+def show_images_grid(imgs_, num_images=25):
+  ncols = int(np.ceil(num_images**0.5))
+  nrows = int(np.ceil(num_images / ncols))
+  _, axes = plt.subplots(ncols, nrows, figsize=(nrows * 3, ncols * 3))
+  axes = axes.flatten()
+
+  for ax_i, ax in enumerate(axes):
+    if ax_i < num_images:
+      ax.imshow(imgs_[ax_i], cmap='Greys_r',  interpolation='nearest')
+      ax.set_xticks([])
+      ax.set_yticks([])
+    else:
+      ax.axis('off')
 
 
 def load_mnist(flatten=False):
@@ -99,9 +143,79 @@ def load_dsprites(size=-1, validation_set=None, format='channels_last'):
         dataset_size = imgs.shape[0]
 
     if validation_set == None:
-        return (imgs, None   )
+        return (imgs, None)
     else:
         cut = math.floor(dataset_size * validation_set)
+        return(imgs[cut:], imgs[:cut])
+
+
+def load_dsprites_duo(format='channels_last', validation_set=None):
+    dataset_file = os.environ['HOME'] + '/.keras/datasets/dsprites_duo.npz'
+
+    # try to load dataset
+    try:
+        dataset_zip = np.load(dataset_file, encoding='latin1')
+    except:
+        print('Could not find {}. Trying to generate dataset ...'.format(dataset_file))
+        generate_dsprites_duo()
+        dataset_zip = np.load(dataset_file, encoding='latin1')
+
+    # get images
+    imgs = dataset_zip['data']
+
+    # image dimension
+    isize = imgs.shape[1]
+
+    # dataset size
+    dsize = imgs.shape[0]
+
+    # reshape dataset
+    if format == 'channels_last':
+        imgs = np.reshape(imgs, (dsize, isize, isize, 1))
+    else:
+        imgs = np.reshape(imgs, (dsize, 1, isize, isize))
+
+    if validation_set == None:
+        return (imgs, None)
+    else:
+        cut = math.floor(dsize * validation_set)
+        return(imgs[cut:], imgs[:cut])
+
+
+def load_dsprites_translational(format='channels_last', validation_set=None, with_scale=False):
+
+    if not with_scale:
+        dataset_file = os.environ['HOME'] + '/.keras/datasets/dsprites_translational.npz'
+    else:
+        dataset_file = os.environ['HOME'] + '/.keras/datasets/dsprites_trans_scale.npz'
+
+    # try to load dataset
+    try:
+        dataset_zip = np.load(dataset_file, encoding='latin1')
+    except:
+        print('Could not find {}. Trying to generate dataset ...'.format(dataset_file))
+        generate_dsprites_translational(with_scale=with_scale)
+        dataset_zip = np.load(dataset_file, encoding='latin1')
+
+    # get images
+    imgs = dataset_zip['data']
+
+    # image dimension
+    isize = imgs.shape[1]
+
+    # dataset size
+    dsize = imgs.shape[0]
+
+    # reshape dataset
+    if format == 'channels_last':
+        imgs = np.reshape(imgs, (dsize, isize, isize, 1))
+    else:
+        imgs = np.reshape(imgs, (dsize, 1, isize, isize))
+
+    if validation_set == None:
+        return (imgs, None)
+    else:
+        cut = math.floor(dsize * validation_set)
         return(imgs[cut:], imgs[:cut])
 
 
