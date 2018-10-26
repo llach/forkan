@@ -225,7 +225,7 @@ class bVAE(object):
         print('Training took {}.'.format(end-start))
 
         if savefile is not None:
-            dest = os.environ['HOME'] + '/' + savefile + '.h5'
+            dest = os.environ['HOME'] + '/' + savefile + '_beta' + str(self.beta) + '.h5'
             self.vae.save_weights(dest, overwrite=True)
 
 
@@ -234,16 +234,18 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--save', type=str, default=None)
+    parser.add_argument('--beta', type=float, default=1)
+    parser.add_argument('--epochs', type=int, default=100)
     args = parser.parse_args()
 
     # load data
-    x_train, _ = load_dsprites_translational(repetitions=5)
+    x_train, _ = load_dsprites_translational(repetitions=None)
     x_val = load_dsprites_one_fixed()
 
     # get image size
     image_size = x_train.shape[1]
 
-    vae = bVAE((image_size, image_size, 1), latent_dim=5, beta=4)
+    vae = bVAE((image_size, image_size, 1), latent_dim=5, beta=args.beta)
     vae.compile()
-    vae.fit(x_train, val=x_val, epochs=100, savefile=args.save)
+    vae.fit(x_train, val=x_val, epochs=args.epochs, savefile=args.save)
 
