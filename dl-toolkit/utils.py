@@ -238,7 +238,8 @@ def load_dsprites_duo(format='channels_last', validation_set=None):
         return(imgs[cut:], imgs[:cut])
 
 
-def load_dsprites_translational(format='channels_last', validation_set=None, with_scale=False):
+def load_dsprites_translational(format='channels_last', validation_set=None, with_scale=False,
+                                repetitions=1):
 
     if not with_scale:
         dataset_file = os.environ['HOME'] + '/.keras/datasets/dsprites_translational.npz'
@@ -253,8 +254,13 @@ def load_dsprites_translational(format='channels_last', validation_set=None, wit
         generate_dsprites_translational(with_scale=with_scale)
         dataset_zip = np.load(dataset_file, encoding='latin1')
 
+    # datasets shall have the same size, whether scale is enabled or not
+    # this allows to compare progress after each epoch
+    if not with_scale:
+        repetitions *= 6
+
     # get images
-    imgs = dataset_zip['data']
+    imgs = np.repeat(dataset_zip['data'], repetitions, axis=0)
 
     # image dimension
     isize = imgs.shape[1]

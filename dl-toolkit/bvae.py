@@ -221,11 +221,11 @@ class bVAE(object):
         print('Training took {}.'.format(end-start))
 
 
-# simple test using MNIST dataset
+# simple test using dsprites dataset
 if __name__ == '__main__':
 
     # load data
-    x_train, _ = load_dsprites_translational()
+    x_train, _ = load_dsprites_translational(repetitions=5)
     x_val = load_dsprites_one_fixed()
 
     # get image size
@@ -233,5 +233,5 @@ if __name__ == '__main__':
 
     vae = bVAE((image_size, image_size, 1), latent_dim=5, beta=20)
     vae.compile()
-    vae.fit(x_train, val=x_val, epochs=50)
+    vae.fit(x_train, val=x_val, epochs=75)
 
