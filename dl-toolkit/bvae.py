@@ -250,7 +250,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # load data
-    x_train, x_val = load_dsprites_translational(validation_set=0.02)
+    x_train, _ = load_dsprites_translational(repetitions=1)
+    x_val = load_dsprites_one_fixed()
 
     # get image size
     image_size = x_train.shape[1]
