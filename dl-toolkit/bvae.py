@@ -182,6 +182,16 @@ class bVAE(object):
         # finally, compute the z value
         return z_mean + K.exp(0.5 * z_log_var) * epsilon
 
+    def load(self, weight_path):
+        print('Using weights from {}'.format(weight_path.split('/')[-1]))
+        self.vae.load_weights(weight_path)
+
+    def encode(self, data):
+        return self.encoder.predict(data)
+
+    def decode(self, latents):
+        return self.decoder.predict(latents)
+
     def compile(self, optimizer='adam'):
 
         # define recontruction loss
@@ -225,7 +235,7 @@ class bVAE(object):
         print('Training took {}.'.format(end-start))
 
         if savefile is not None:
-            dest = os.environ['HOME'] + '/' + savefile + '_beta' + str(self.beta) + '.h5'
+            dest = '{}/{}_b{}_L{}.h5'.format(os.environ['HOME'], savefile, self.beta, self.latent_dim)
             self.vae.save_weights(dest, overwrite=True)
 
 
@@ -235,17 +245,17 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--save', type=str, default=None)
     parser.add_argument('--beta', type=float, default=1)
+    parser.add_argument('--latents', type=int, default=5)
     parser.add_argument('--epochs', type=int, default=100)
     args = parser.parse_args()
 
     # load data
-    x_train, _ = load_dsprites_translational(repetitions=None)
-    x_val = load_dsprites_one_fixed()
+    x_train, x_val = load_dsprites_translational(validation_set=0.02)
 
     # get image size
     image_size = x_train.shape[1]
 
-    vae = bVAE((image_size, image_size, 1), latent_dim=5, beta=args.beta)
+    vae = bVAE((image_size, image_size, 1), latent_dim=args.latents, beta=args.beta)
     vae.compile()
     vae.fit(x_train, val=x_val, epochs=args.epochs, savefile=args.save)
 
