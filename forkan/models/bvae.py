@@ -3,8 +3,6 @@ from __future__ import absolute_import
 import tensorflow as tf
 import numpy as np
 import argparse
-import time
-import sys
 import os
 
 from keras import Model
@@ -14,12 +12,11 @@ from keras.callbacks import TensorBoard, Callback
 from keras.losses import binary_crossentropy
 from keras.layers import (Conv2D, Conv2DTranspose, Dense,
                           Input, Lambda, Flatten, Reshape)
-from keras.layers.advanced_activations import LeakyReLU
 from keras.utils import plot_model
 from keras import backend as K
 
-from utils import (prune_dataset, load_dsprites, animate_greyscale_dataset,
-                   load_dsprites_translational, load_dsprites_duo, load_dsprites_one_fixed)
+from forkan.utils import prune_dataset
+from forkan.datasets.dsprites import load_dsprites, load_dsprites_one_fixed
 
 class Sigma(Callback):
 
@@ -210,32 +207,39 @@ class bVAE(object):
         # compile entire auto encoder
         self.vae.compile(optimizer, metrics=['accuracy'])
 
-    def fit(self, train, val=None, epochs=50, batch_size=128, savefile=None):
+    def fit(self, train, val=None, epochs=50, batch_size=128,
+            savefile_prefix=None, print_sigma=False):
 
         # prune datasets to avoid error
         train = prune_dataset(train, batch_size)
 
-        # define tensorboard callback
+        # define callbacks
+        callbacks = []
+
         tb = TensorBoard(log_dir='/tmp/graph', histogram_freq=0, batch_size=batch_size,
                          write_graph=True, write_images=True, update_freq=1000)
 
-        sc = Sigma(self)
+        callbacks.append(tb)
+
+        if print_sigma:
+            sc = Sigma(self)
+            callbacks.append(sc)
 
         # train vae
-        start = time.time()
+        start = datetime.now()
 
         if val is not None:
             self.vae.fit(train, epochs=epochs, batch_size=batch_size,
-                         callbacks=[tb, sc], validation_data=(val, None))
+                         callbacks=callbacks, validation_data=(val, None))
         else:
             self.vae.fit(train, epochs=epochs, batch_size=batch_size,
-                         callbacks=[tb, sc])
+                         callbacks=callbacks)
 
-        end = time.time()
-        print('Training took {}.'.format(end-start))
+        elapsed = datetime.now() - start
+        print('Training took {}.'.format(elapsed))
 
-        if savefile is not None:
-            dest = '{}/{}_b{}_L{}.h5'.format(os.environ['HOME'], savefile, self.beta, self.latent_dim)
+        if savefile_prefix is not None:
+            dest = '{}/{}_b{}_L{}.h5'.format(os.environ['HOME'], savefile_prefix, self.beta, self.latent_dim)
             self.vae.save_weights(dest, overwrite=True)
 
 
@@ -250,7 +254,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # load data
-    x_train, _ = load_dsprites_translational(repetitions=1)
+    x_train, _ = load_dsprites('translation')
     x_val = load_dsprites_one_fixed()
 
     # get image size
@@ -258,5 +262,5 @@ if __name__ == '__main__':
 
     vae = bVAE((image_size, image_size, 1), latent_dim=args.latents, beta=args.beta)
     vae.compile()
-    vae.fit(x_train, val=x_val, epochs=args.epochs, savefile=args.save)
+    vae.fit(x_train, val=x_val, epochs=args.epochs, savefile_prefix=args.save)
 

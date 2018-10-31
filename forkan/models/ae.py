@@ -3,11 +3,12 @@ from tensorflow.python import debug as tf_debug
 
 from keras import Model
 from keras.callbacks import TensorBoard
-from keras.losses import binary_crossentropy, mse
-from keras.layers import Dense, Input, Lambda
+from keras.losses import  mse
+from keras.layers import Dense, Input
 from keras import backend as K
 
-from .utils import load_mnist, prune_dataset
+from forkan.datasets.mnist import load_mnist
+from forkan.utils import prune_dataset
 
 
 class DenseAE(object):
