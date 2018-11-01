@@ -7,7 +7,7 @@ setup(name='forkan',
       author='Luca Lach',
       author_email='llach@teachfak.uni-bielefeld.de',
       url='https://github.com/llach/dl-toolkit',
-      install_requires=['tensorflow>=1.11.0',
+      install_requires=['tensorflow-gpu>=1.11.0',
                         'matplotlib>=3.0.0',
                         'keras>=2.2.4'],
       packages=find_packages())

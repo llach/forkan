@@ -1,0 +1,61 @@
+name: bvae-test
+dataset:
+  name: translation
+model:
+  name: bvae
+  beta: 30
+  latent_dim: 5
+training:
+  epochs: 1
+---
+name: bvae-dsprites
+dataset:
+  name: dsprites
+model:
+  name: bvae
+  beta: 35
+  latent_dim: 5
+training:
+  epochs: 500
+---
+name: bvae-duo
+dataset:
+  name: dsprites_duo
+model:
+  name: bvae
+  beta: 35
+  latent_dim: 10
+training:
+  epochs: 500
+---
+name: bvae-dsprites
+dataset:
+  name: translation_scale
+model:
+  name: bvae
+  beta: 30
+  latent_dim: 5
+training:
+  epochs: 500
+---
+name: bvae-large-latent
+dataset:
+  name: translation_scale
+model:
+  name: bvae
+  beta: 20
+  latent_dim: 200
+training:
+  epochs: 500
+---
+name: bvae-very-large-latent
+dataset:
+  name: translation_scale
+model:
+  name: bvae
+  beta: 8
+  latent_dim: 1000
+training:
+  epochs: 500
+
+

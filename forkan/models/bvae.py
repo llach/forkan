@@ -3,7 +3,6 @@ from __future__ import absolute_import
 import tensorflow as tf
 import numpy as np
 import argparse
-import os
 
 from keras import Model
 from datetime import datetime
@@ -15,6 +14,7 @@ from keras.layers import (Conv2D, Conv2DTranspose, Dense,
 from keras.utils import plot_model
 from keras import backend as K
 
+from forkan import weights_path
 from forkan.utils import prune_dataset
 from forkan.datasets.dsprites import load_dsprites, load_dsprites_one_fixed
 
@@ -138,6 +138,10 @@ class bVAE(object):
         self.latent_dim = latent_dim
         self.input_shape = input_shape
 
+        # some metadata for weight file names
+        self.name = 'bvae'
+        self.epochs = None
+
         # print summaries
         print('################### ENCODER ###################')
         self.encoder.summary()
@@ -183,6 +187,11 @@ class bVAE(object):
         print('Using weights from {}'.format(weight_path.split('/')[-1]))
         self.vae.load_weights(weight_path)
 
+    def save(self, dataset_name):
+        dest = '{}/{}_{}_b{}_L{}_E{}.h5'.format(weights_path, self.name,dataset_name,
+                                            self.beta, self.latent_dim, self.epoch)
+        self.vae.save_weights(dest, overwrite=True)
+
     def encode(self, data):
         return self.encoder.predict(data)
 
@@ -209,6 +218,10 @@ class bVAE(object):
 
     def fit(self, train, val=None, epochs=50, batch_size=128,
             savefile_prefix=None, print_sigma=False):
+
+
+        # save epochs for weight file name
+        self.epochs = epochs
 
         # prune datasets to avoid error
         train = prune_dataset(train, batch_size)
@@ -237,10 +250,6 @@ class bVAE(object):
 
         elapsed = datetime.now() - start
         print('Training took {}.'.format(elapsed))
-
-        if savefile_prefix is not None:
-            dest = '{}/{}_b{}_L{}.h5'.format(os.environ['HOME'], savefile_prefix, self.beta, self.latent_dim)
-            self.vae.save_weights(dest, overwrite=True)
 
 
 # simple test using dsprites dataset
