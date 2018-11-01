@@ -21,7 +21,7 @@ class ConfigManager(object):
         print('Found {} configs.'.format(len(self.available_configs)))
 
         # save only configs we want to use; if none, we use all
-        if active_configs is not None:
+        if len(active_configs) > 0:
             for ac in self.active_configs:
 
                 found = False
