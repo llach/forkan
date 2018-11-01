@@ -189,7 +189,7 @@ class bVAE(object):
 
     def save(self, dataset_name):
         dest = '{}/{}_{}_b{}_L{}_E{}.h5'.format(weights_path, self.name,dataset_name,
-                                            self.beta, self.latent_dim, self.epoch)
+                                            self.beta, self.latent_dim, self.epochs)
         self.vae.save_weights(dest, overwrite=True)
 
     def encode(self, data):
