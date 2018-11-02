@@ -20,7 +20,7 @@ training:
 ---
 name: bvae-duo
 dataset:
-  name: dsprites_duo
+  name: duo
 model:
   name: bvae
   beta: 35
@@ -28,7 +28,7 @@ model:
 training:
   epochs: 500
 ---
-name: bvae-dsprites
+name: bvae-trans-scale
 dataset:
   name: translation_scale
 model:
