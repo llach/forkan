@@ -7,7 +7,7 @@ dataset_list = [
     'translation',
     'translation_scale',
     'dsprites_one_fixed',
-    'dsprites_duo'
+    'duo'
 ]
 
 def load_dataset(dataset_name, kwargs):
@@ -28,8 +28,8 @@ def load_dataset(dataset_name, kwargs):
     elif dataset_name == 'dsprites_one_fixed':
         train, val = load_dsprites_one_fixed(**kwargs)
         shape = (train.shape[1:])
-    elif dataset_name == 'dsprites_duo':
-        train, val = load_dsprites(type='dsprites_duo', **kwargs)
+    elif dataset_name == 'duo':
+        train, val = load_dsprites(type='duo', **kwargs)
         shape = (train.shape[1:])
 
     return train, val, shape
