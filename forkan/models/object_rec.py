@@ -76,7 +76,7 @@ train_datagen.fit(x_train)
 test_datagen.fit(x_test)
 
 # Save the model according to the conditions
-checkpoint = ModelCheckpoint(DATASET_NAME+'.{epoch:02d}-{val_loss:.2f}.hdf5', monitor='val_acc', verbose=1,
+checkpoint = ModelCheckpoint(DATASET_NAME+'_E{epoch}_VA{val_acc:.2f}.hdf5', monitor='val_acc', verbose=1,
                              save_best_only=True, save_weights_only=False, mode='auto', period=1)
 
 # Train the model
