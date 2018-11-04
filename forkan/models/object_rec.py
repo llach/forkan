@@ -1,7 +1,7 @@
 from keras.applications import InceptionResNetV2
 from keras.preprocessing.image import ImageDataGenerator
 from keras.models import Model
-from keras.layers import Dense, Input, GlobalAveragePooling2D
+from keras.layers import Dense, Input, Dropout, GlobalAveragePooling2D
 from keras.callbacks import ModelCheckpoint
 
 from forkan.datasets.image import load_image_dataset
@@ -41,6 +41,9 @@ x = GlobalAveragePooling2D()(base_model.output)
 
 # let's add a fully-connected layer
 x = Dense(1024, activation='relu')(x)
+
+#add some dropout
+x = Dropout(.25)(x)
 
 # and a logistic layer
 predictions = Dense(nb_classes, activation='softmax')(x)
