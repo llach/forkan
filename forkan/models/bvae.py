@@ -83,7 +83,7 @@ class bVAE(object):
         self.z = Lambda(self._sample, output_shape=(latent_dim,), name='z')([self.z_mean, self.z_log_var])
 
         # final encoder layer is sampling layer
-        self.encoder = Model(self.inputs, [self.z_mean ,self.z_log_var, self.z], name='encoder')
+        self.encoder = Model(self.inputs, [self.z_mean, self.z_log_var, self.z], name='encoder')
 
         # define decoder input layer
         self.de_inputs = Input(shape=(latent_dim,))

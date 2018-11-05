@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import seaborn as sns
 import numpy as np
 
 from forkan.config_manager import ConfigManager
@@ -25,12 +26,13 @@ frames = np.mean(frames, axis=0)
 frames = np.rollaxis(frames, -1)
 
 # create subplots
-f, axes = plt.subplots(1, 5, sharey=True)
+f, axes = plt.subplots(1, 5, sharey=True, figsize=(16, 8))
 
 # show them heatmaps
-for r in range(5):
-    axes[r].imshow(frames[r])
-    axes[r].set_title('z{}'.format(r))
+for r, ax in enumerate(axes.flat):
+    sns.heatmap(frames[r], ax=ax)
+    ax.set_aspect('equal', 'box-forced')
+    ax.set_title('z{}'.format(r))
 
 plt.show()
 
