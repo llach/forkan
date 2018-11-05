@@ -28,6 +28,16 @@ model:
 training:
   epochs: 500
 ---
+name: bvae-trans
+dataset:
+  name: translation
+model:
+  name: bvae
+  beta: 30
+  latent_dim: 5
+training:
+  epochs: 500
+---
 name: bvae-trans-scale
 dataset:
   name: translation_scale

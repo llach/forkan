@@ -10,6 +10,16 @@ dataset_list = [
     'duo'
 ]
 
+dataset2input_shape = {
+    'mnist': (28, 28, 1),
+    'dsprites': (64, 64, 1),
+    'translation': (64, 64, 1),
+    'translation_scale': (64, 64, 1),
+    'dsprites_one_fixed': (64, 64, 1),
+    'duo': (64, 64, 1),
+}
+
+
 def load_dataset(dataset_name, kwargs):
     print('Loading dataset {} ...'.format(dataset_name))
 

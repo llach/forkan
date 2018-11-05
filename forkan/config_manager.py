@@ -2,13 +2,14 @@ import forkan
 import yaml
 import sys
 
+from forkan import weights_path
 from forkan.models import model_list, load_model
-from forkan.datasets import dataset_list, load_dataset
+from forkan.datasets import dataset_list, load_dataset, dataset2input_shape
 
 
 class ConfigManager(object):
 
-    def __init__(self, active_configs, config_file):
+    def __init__(self, config_file, active_configs=[]):
 
         self.configs = []
         self.active_configs = active_configs
@@ -40,6 +41,9 @@ class ConfigManager(object):
 
         print('Loaded {} configs.'.format(len(self.configs)))
 
+        # check configs after loading
+        self.check()
+
     def check(self):
 
         # check for mandatory config parameter
@@ -58,7 +62,6 @@ class ConfigManager(object):
                 sys.exit(1)
 
         print('Checks were successful.')
-
 
     def exec(self):
 
@@ -80,4 +83,30 @@ class ConfigManager(object):
             # save weights
             model.save(dataset_name)
 
+    def get_config_by_name(self, name):
 
+        for conf in self.configs:
+            if conf['name'] == name:
+                return conf
+
+        print('Config {} was not found!'.format(name))
+        sys.exit(1)
+
+    def restore_model(self, name):
+
+        conf = self.get_config_by_name(name)
+
+        # get model and dataset name
+        dataset_name = dataset_name = conf['dataset'].pop('name')
+        train, val, input_shape = load_dataset(dataset_name, conf['dataset'])
+
+        model_name = conf['model'].pop('name')
+
+        # restore weight path from config
+        weights = '{}/{}_{}_b{}_L{}_E{}.h5'.format(weights_path, model_name, dataset_name,conf['model']['beta'],
+                                                   conf['model']['latent_dim'], conf['training']['epochs'])
+
+        model = load_model(model_name, input_shape, conf['model'])
+        model.load(weights)
+
+        return model, (train, val)

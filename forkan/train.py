@@ -7,6 +7,5 @@ parser = argparse.ArgumentParser()
 parser.add_argument('configs', nargs='*', type=str, default=None)
 args = parser.parse_args()
 
-cm = ConfigManager(args.configs, 'train')
-cm.check()
+cm = ConfigManager('train', active_configs=args.configs)
 cm.exec()

@@ -184,7 +184,7 @@ class bVAE(object):
         return z_mean + K.exp(0.5 * z_log_var) * epsilon
 
     def load(self, weight_path):
-        print('Using weights from {}'.format(weight_path.split('/')[-1]))
+        print('Using weights: {}'.format(weight_path.split('/')[-1]))
         self.vae.load_weights(weight_path)
 
     def save(self, dataset_name):
