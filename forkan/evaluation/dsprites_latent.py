@@ -1,8 +1,11 @@
 import matplotlib.pyplot as plt
+import logging
 import seaborn as sns
 import numpy as np
 
 from forkan.config_manager import ConfigManager
+
+logger = logging.getLogger(__name__)
 
 cm = ConfigManager('train')
 model, dataset = cm.restore_model('bvae-trans')
@@ -36,4 +39,4 @@ for r, ax in enumerate(axes.flat):
 
 plt.show()
 
-print('Done.')
+logger.info('Done.')

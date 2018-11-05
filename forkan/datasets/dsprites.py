@@ -1,5 +1,6 @@
 import numpy as np
 
+import logging
 import urllib
 import errno
 import math
@@ -28,6 +29,7 @@ dataset_size = None
 latents_sizes = None
 latents_bases = None
 
+logger = logging.getLogger(__name__)
 
 def latent_to_index(latents):
     return np.dot(latents, latents_bases).astype(int)
@@ -42,11 +44,11 @@ def sample_latent(size=1):
 
 
 def download_dsprites(dest):
-    print('Downloading original dataset ...')
+    logger.debug('Downloading original dataset ...')
 
     urllib.request.urlretrieve(DSPRITES_LINK, dest)
 
-    print('Done!')
+    logger.debug('Done!')
 
 
 def prepare_dsprites(type, repetitions=None):
@@ -78,7 +80,7 @@ def prepare_dsprites(type, repetitions=None):
     try:
         dataset_zip = np.load(dataset_file, encoding='latin1')
     except:
-        print('Could not load {}. Exiting.'.format(dataset_file))
+        logger.error('Could not load {}. Exiting.'.format(dataset_file))
         sys.exit(1)
 
     global imgs
@@ -179,13 +181,13 @@ def generate_dsprites_duo():
     # initialize output array
     duo = np.empty((0, image_size, image_size))
 
-    print('Generating duo dataset ...')
+    logger.info('Generating duo dataset ...')
 
     # iterate over every second step of square and heart
     for bx in range(0, 32, 2):
-        print('Step x {} with {} samples.'.format(bx//2, len(duo)))
+        logger.debug('Step x {} with {} samples.'.format(bx//2, len(duo)))
         for by in range(0, 32, 2):
-            # print('Step y {} with {} samples.'.format(by// 2, len(duo)))
+            logger.debug('Step y {} with {} samples.'.format(by// 2, len(duo)))
 
             # get base array
             bidx = latent_to_index([0, 0, 0, 0, bx, by])
@@ -213,13 +215,13 @@ def generate_dsprites_duo():
             # add to main array
             duo = np.concatenate((duo, tmp), axis=0)
 
-    print('Successfully generated new dataset containing {} samples.\nSaving ...'.format(len(duo)))
+    logger.info('Successfully generated new dataset containing {} samples.\nSaving ...'.format(len(duo)))
 
     # saving dataset
     with open(dataset_dest, 'wb') as file:
         np.savez_compressed(file, imgs=duo)
 
-    print('Done.')
+    logger.info('Done.')
 
 
 def generate_dsprites_translation(with_scale=False):
@@ -236,7 +238,7 @@ def generate_dsprites_translation(with_scale=False):
     else:
         dataset_dest = os.environ['HOME'] + '/.keras/datasets/dsprites_translation_scale.npz'
 
-    print('Generating translation dataset ...')
+    logger.info('Generating translation dataset ...')
 
     # extract only translational latents
     latents = []
@@ -250,13 +252,13 @@ def generate_dsprites_translation(with_scale=False):
 
     trans = imgs[latent_to_index(latents)]
 
-    print('Successfully generated new dataset containing {} samples.\nSaving ...'.format(len(trans)))
+    logger.info('Successfully generated new dataset containing {} samples.\nSaving ...'.format(len(trans)))
 
     # saving dataset
     with open(dataset_dest, 'wb') as file:
         np.savez_compressed(file, imgs=trans)
 
-    print('Done.')
+    logger.info('Done.')
 
 if __name__ == '__main__':
     train, val = load_dsprites('translation')

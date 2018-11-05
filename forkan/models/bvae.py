@@ -2,6 +2,8 @@ from __future__ import absolute_import
 
 import tensorflow as tf
 import numpy as np
+
+import logging
 import argparse
 
 from keras import Model
@@ -22,6 +24,8 @@ class Sigma(Callback):
 
     def __init__(self, vae):
         super().__init__()
+
+        self.logger = logging.getLogger(__name__)
         self.vae = vae
 
     def on_epoch_end(self, epoch, logs=None):
@@ -32,14 +36,16 @@ class Sigma(Callback):
         # calculate mean of varinaces
         variance_mean = np.mean(np.exp(pred[1]), axis=0)
 
-        print('Current variance: {}'.format(variance_mean))
-        print('Current variance: {}'.format(np.exp(pred[1])[0]))
+        self.logger.debug('Current variance: {}'.format(variance_mean))
+        self.logger.debug('Current variance: {}'.format(np.exp(pred[1])[0]))
 
 
 class bVAE(object):
 
     def __init__(self, input_shape, latent_dim=10, initial_bias=.1,
                  beta=1., debug=False, plot_models=False):
+
+        self.logger = logging.getLogger(__name__)
 
         # define encoder input layer
         self.inputs = Input(shape=input_shape)
@@ -142,12 +148,12 @@ class bVAE(object):
         self.name = 'bvae'
         self.epochs = None
 
-        # print summaries
-        print('################### ENCODER ###################')
+        # log summaries
+        self.logger.info('################### ENCODER ###################')
         self.encoder.summary()
-        print('################### DECODER ###################')
+        self.logger.info('################### DECODER ###################')
         self.decoder.summary()
-        print('###################  MODEL  ###################')
+        self.logger.info('###################  MODEL  ###################')
         self.vae.summary()
 
         if plot_models:
@@ -184,7 +190,7 @@ class bVAE(object):
         return z_mean + K.exp(0.5 * z_log_var) * epsilon
 
     def load(self, weight_path):
-        print('Using weights: {}'.format(weight_path.split('/')[-1]))
+        self.logger.info('Using weights: {}'.format(weight_path.split('/')[-1]))
         self.vae.load_weights(weight_path)
 
     def save(self, dataset_name):
@@ -217,7 +223,7 @@ class bVAE(object):
         self.vae.compile(optimizer, metrics=['accuracy'])
 
     def fit(self, train, val=None, epochs=50, batch_size=128,
-            savefile_prefix=None, print_sigma=False):
+            savefile_prefix=None, log_sigma=False):
 
 
         # save epochs for weight file name
@@ -234,7 +240,7 @@ class bVAE(object):
 
         callbacks.append(tb)
 
-        if print_sigma:
+        if log_sigma:
             sc = Sigma(self)
             callbacks.append(sc)
 
@@ -249,7 +255,7 @@ class bVAE(object):
                          callbacks=callbacks)
 
         elapsed = datetime.now() - start
-        print('Training took {}.'.format(elapsed))
+        self.logger.info('Training took {}.'.format(elapsed))
 
 
 # simple test using dsprites dataset

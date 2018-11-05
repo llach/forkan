@@ -1,10 +1,13 @@
 import os
 import math
 import numpy as np
+import logging
 import matplotlib.pyplot as plt
 
 from PIL import Image
 from keras.utils import to_categorical
+
+logger = logging.getLogger(__name__)
 
 def animate_greyscale_dataset(dataset):
     '''
@@ -60,7 +63,7 @@ def prune_dataset(set, batch_size):
 
 def folder_to_npz(prefix, name, target_size, test_set):
 
-    print('Converting {} to npz file.'.format(name))
+    logger.info('Converting {} to npz file.'.format(name))
 
     # arrays for train & test images and labels
     x_train = np.empty([0] + target_size)
@@ -85,7 +88,7 @@ def folder_to_npz(prefix, name, target_size, test_set):
             continue
 
         class_name = directory.split('/')[-1]
-        print('Found class {} with {} samples.'.format(class_name, len(file_list)))
+        logger.info('Found class {} with {} samples.'.format(class_name, len(file_list)))
 
         # store idx -> label mapping
         idx = len(idx2label)
@@ -115,7 +118,7 @@ def folder_to_npz(prefix, name, target_size, test_set):
         nb_test = math.floor(class_imgs.shape[0]*test_set)
         nb_train = class_imgs.shape[0] - nb_test
 
-        print('Splitting into {} train and {} test samples.'.format(nb_train, nb_test))
+        logger.info('Splitting into {} train and {} test samples.'.format(nb_train, nb_test))
 
         # randomly shuffle dataset before splitting into train & test
         np.random.shuffle(class_imgs)
@@ -135,9 +138,9 @@ def folder_to_npz(prefix, name, target_size, test_set):
     nb_classes = len(idx2label.keys())
     y_train = to_categorical(y_train, nb_classes)
     y_test = to_categorical(y_test, nb_classes)
-    
-    print('Dataset has {} train and {} test samples.'.format(x_train.shape[0], x_test.shape[0]))
-    print('Saving dataset ...')
+
+    logger.info('Dataset has {} train and {} test samples.'.format(x_train.shape[0], x_test.shape[0]))
+    logger.info('Saving dataset ...')
 
     # save dataset
     with open(dataset_save, 'wb') as file:
@@ -145,4 +148,4 @@ def folder_to_npz(prefix, name, target_size, test_set):
                             x_test=x_test, y_test=y_test,
                             idx2label=idx2label, label2idx=label2idx)
 
-    print('Done!')
+    logger.info('Done!')

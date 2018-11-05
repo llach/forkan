@@ -1,3 +1,5 @@
+import logging
+
 from forkan.datasets.mnist import load_mnist
 from forkan.datasets.dsprites import load_dsprites, load_dsprites_one_fixed
 
@@ -19,9 +21,10 @@ dataset2input_shape = {
     'duo': (64, 64, 1),
 }
 
+logger = logging.getLogger(__name__)
 
 def load_dataset(dataset_name, kwargs={}):
-    print('Loading dataset {} ...'.format(dataset_name))
+    logger.info('Loading dataset {} ...'.format(dataset_name))
 
     if dataset_name == 'mnist':
         train, val = load_mnist(**kwargs)

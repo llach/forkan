@@ -1,10 +1,13 @@
 import matplotlib.pyplot as plt
+import logging
 import seaborn as sns
 import numpy as np
 
 from scipy.ndimage.measurements import label
 from forkan.config_manager import ConfigManager
 from forkan.datasets import load_dataset
+
+logger = logging.getLogger(__name__)
 
 cm = ConfigManager('train')
 model = cm.restore_model('bvae-duo', with_dataset=False)
@@ -57,4 +60,4 @@ for r, ax in enumerate(axes.flat):
 
 plt.show()
 
-print('Done.')
+logger.info('Done.')

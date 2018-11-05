@@ -1,3 +1,4 @@
+import logging
 import forkan
 import yaml
 import sys
@@ -11,6 +12,8 @@ class ConfigManager(object):
 
     def __init__(self, config_file, active_configs=[]):
 
+        self.logger = logging.getLogger(__name__)
+
         self.configs = []
         self.active_configs = active_configs
         self.config_file_name = '{}.yml'.format(config_file)
@@ -19,7 +22,7 @@ class ConfigManager(object):
         with open(self.config_file_path, 'r') as cf:
             self.available_configs = [d for d in yaml.load_all(cf)]
 
-        print('Found {} configs.'.format(len(self.available_configs)))
+        self.logger.debug('Found {} configs.'.format(len(self.available_configs)))
 
         # save only configs we want to use; if none, we use all
         if len(active_configs) > 0:
@@ -34,12 +37,12 @@ class ConfigManager(object):
                         break
 
                 if not found:
-                    print('Could not find config {}'.format(ac))
+                    self.logger.error('Could not find config {}'.format(ac))
                     sys.exit(1)
         else:
             self.configs = self.available_configs
 
-        print('Loaded {} configs.'.format(len(self.configs)))
+        self.logger.debug('Loaded {} configs.'.format(len(self.configs)))
 
         # check configs after loading
         self.check()
@@ -49,19 +52,19 @@ class ConfigManager(object):
         # check for mandatory config parameter
         for conf in self.configs:
             if 'name' not in conf['model']:
-                print('No model name given for config {}!'.format(conf['name']))
+                self.logger.error('No model name given for config {}!'.format(conf['name']))
                 sys.exit(1)
             elif 'name' not in conf['dataset']:
-                print('No dataset name given for config {}!'.format(conf['name']))
+                self.logger.error('No dataset name given for config {}!'.format(conf['name']))
                 sys.exit(1)
             elif conf['model']['name'] not in model_list:
-                print('Unkown model {}'.format(conf['model']['name']))
+                self.logger.error('Unkown model {}'.format(conf['model']['name']))
                 sys.exit(1)
             elif conf['dataset']['name'] not in dataset_list:
-                print('Unkown dataset {}'.format(conf['dataset']['name']))
+                self.logger.error('Unkown dataset {}'.format(conf['dataset']['name']))
                 sys.exit(1)
 
-        print('Checks were successful.')
+        self.logger.debug('Checks were successful.')
 
     def exec(self):
 
@@ -89,7 +92,7 @@ class ConfigManager(object):
             if conf['name'] == name:
                 return conf
 
-        print('Config {} was not found!'.format(name))
+        self.logger.error('Config {} was not found!'.format(name))
         sys.exit(1)
 
     def restore_model(self, name, with_dataset=True):

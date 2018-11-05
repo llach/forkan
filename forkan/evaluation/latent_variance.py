@@ -1,9 +1,11 @@
 import matplotlib.pyplot as plt
+import logging
 import seaborn as sns
 import numpy as np
 
-
 from forkan.config_manager import ConfigManager
+
+logger = logging.getLogger(__name__)
 
 dataset2zi_shape = {
     'bvae-trans': [1, 5],
@@ -41,4 +43,4 @@ sns.heatmap(zi, linewidth=0.5)
 
 plt.show()
 
-print('Done.')
+logger.info('Done.')

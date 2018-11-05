@@ -1,3 +1,4 @@
+import logging
 import tensorflow as tf
 from tensorflow.python import debug as tf_debug
 
@@ -14,6 +15,8 @@ from forkan.utils import prune_dataset
 class DenseAE(object):
 
     def __init__(self, input_dim, latent_dim, beta=1., debug=False):
+
+        self.logger = logging.getLogger(__name__)
 
         # define encoder input layer
         self.inputs = Input(shape=(input_dim,))
@@ -50,12 +53,12 @@ class DenseAE(object):
         self.latent_dim = latent_dim
         self.input_dim = input_dim
 
-        # print summaries
-        print('################### ENCODER ###################')
+        # log summaries
+        self.logger.info('################### ENCODER ###################')
         self.encoder.summary()
-        print('################### DECODER ###################')
+        self.logger.info('################### DECODER ###################')
         self.decoder.summary()
-        print('###################  MODEL  ###################')
+        self.logger.info('###################  MODEL  ###################')
         self.vae.summary()
 
         if debug:
