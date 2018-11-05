@@ -28,6 +28,16 @@ model:
 training:
   epochs: 500
 ---
+name: bvae-duo-short
+dataset:
+  name: duo
+model:
+  name: bvae
+  beta: 35
+  latent_dim: 10
+training:
+  epochs: 100
+---
 name: bvae-trans
 dataset:
   name: translation
@@ -47,6 +57,16 @@ model:
   latent_dim: 5
 training:
   epochs: 500
+---
+name: bvae-trans-scale-short
+dataset:
+  name: translation_scale
+model:
+  name: bvae
+  beta: 30
+  latent_dim: 5
+training:
+  epochs: 100
 ---
 name: bvae-large-latent
 dataset:
