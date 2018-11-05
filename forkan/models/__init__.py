@@ -6,7 +6,7 @@ model_list = [
     'bvae'
 ]
 
-def load_model(model_name, shape, kwargs):
+def load_model(model_name, shape, kwargs={}):
     print('Loading model {} ...'.format(model_name))
 
     if model_name == 'ae':

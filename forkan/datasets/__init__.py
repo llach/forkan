@@ -20,7 +20,7 @@ dataset2input_shape = {
 }
 
 
-def load_dataset(dataset_name, kwargs):
+def load_dataset(dataset_name, kwargs={}):
     print('Loading dataset {} ...'.format(dataset_name))
 
     if dataset_name == 'mnist':

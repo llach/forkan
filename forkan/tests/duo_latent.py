@@ -1,27 +1,15 @@
 import matplotlib.pyplot as plt
-
 import numpy as np
 
-import argparse
+from forkan.config_manager import ConfigManager
+from forkan.datasets import load_dataset
 
-from bvae import bVAE
+cm = ConfigManager('train')
+model = cm.restore_model('bvae-duo', with_dataset=False)
+dataset = load_dataset('translation')
 
-from utils import (prune_dataset, load_dsprites, animate_greyscale_dataset,
-                   load_dsprites_translational, load_dsprites_duo, load_dsprites_one_fixed)
-
-parser = argparse.ArgumentParser()
-parser.add_argument("-w", "--weights", type=str, default=None)
-args = parser.parse_args()
-
-# load data
-x_train, _ = load_dsprites_duo()
-
-# get image size
-image_size = x_train.shape[1]
-
-# load beta-VAE
-bvae = bVAE((image_size, image_size, 1), latent_dim=10, beta=30)
-bvae.load('/home/llach/studies/thesis/bvae/duo_beta30.0_L10.h5')
+# we only want the training set
+x_train = dataset[0]
 
 # truncate data
 x_train = x_train[:1024]
@@ -35,9 +23,7 @@ set = np.reshape(x_train, [ 32, 32, 64, 64])
 
 for x in range(32):
     for y in range(32):
-        frames[x, y] = bvae.encode(np.reshape(set[x, y], (1, 64, 64, 1)))[-1]
-
-
+        frames[x, y] = model.encode(np.reshape(set[x, y], (1, 64, 64, 1)))[-1]
 
 # heatmaps first
 frames = np.rollaxis(frames, -1)

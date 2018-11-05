@@ -92,13 +92,17 @@ class ConfigManager(object):
         print('Config {} was not found!'.format(name))
         sys.exit(1)
 
-    def restore_model(self, name):
+    def restore_model(self, name, with_dataset=True):
 
         conf = self.get_config_by_name(name)
 
         # get model and dataset name
-        dataset_name = dataset_name = conf['dataset'].pop('name')
-        train, val, input_shape = load_dataset(dataset_name, conf['dataset'])
+        dataset_name = conf['dataset'].pop('name')
+
+        if with_dataset:
+            train, val, input_shape = load_dataset(dataset_name, conf['dataset'])
+        else:
+            input_shape = dataset2input_shape[dataset_name]
 
         model_name = conf['model'].pop('name')
 
@@ -109,4 +113,7 @@ class ConfigManager(object):
         model = load_model(model_name, input_shape, conf['model'])
         model.load(weights)
 
-        return model, (train, val)
+        if with_dataset:
+            return model, (train, val)
+        else:
+            return model

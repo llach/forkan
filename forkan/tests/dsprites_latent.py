@@ -1,16 +1,15 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import argparse
 
 from forkan.config_manager import ConfigManager
 
 cm = ConfigManager('train')
 model, dataset = cm.restore_model('bvae-trans')
 
-
 # init array that will hold all heatmaps later
 frames = np.empty([3, 32, 32, 5], dtype=float)
 
+# reshape the set for nice iteration
 dataset = np.reshape(dataset[0], [3, 32, 32, 64, 64])
 
 # forward pass all samples
