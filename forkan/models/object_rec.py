@@ -63,6 +63,8 @@ if MODEL_NAME is 'nasnetlarge':
     base_model.layers.pop()
     base_model.layers.pop()
 
+    base_model.compile()
+
 else:
     base_model = MODEL2CLASS[MODEL_NAME](input_tensor=input_tensor, weights='imagenet', include_top=False)
 
