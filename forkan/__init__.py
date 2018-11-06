@@ -27,10 +27,13 @@ logging_config = dict(
         },
 )
 
-
+# config for coloredlogs
 field_styles = coloredlogs.DEFAULT_FIELD_STYLES
 fmt = '%(asctime)s [%(levelname)-8s] %(name)-4s %(message)s'
 datefmt = '%H:%M'
+
+# surpress matplotlib debug bloat
+logging.getLogger('matplotlib').setLevel(logging.WARNING)
 
 dictConfig(logging_config)
 logger = logging.getLogger(__name__)
