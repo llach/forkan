@@ -63,18 +63,19 @@ if MODEL_NAME is 'nasnetlarge':
     base_model.layers.pop()
     base_model.layers.pop()
 
-    base_model.compile()
+    # popping layers has no effect on model.output, se we need to define it
+    output = base_model.layers[-1].output
 
 else:
     base_model = MODEL2CLASS[MODEL_NAME](input_tensor=input_tensor, weights='imagenet', include_top=False)
-
+    output = base_model.output
 
 # don't train the base layers we've just loaded
 for layer in base_model.layers:
     layer.trainable = False
 
 # add a global spatial average pooling layer
-x = GlobalAveragePooling2D()(base_model.output)
+x = GlobalAveragePooling2D()(output)
 
 # let's add a fully-connected layer
 x = Dense(1024, activation='relu')(x)
