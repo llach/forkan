@@ -4,12 +4,14 @@ from keras.models import Model
 from keras.layers import Dense, Input, Dropout, GlobalAveragePooling2D
 from keras.callbacks import ModelCheckpoint
 
+from forkan import weights_path
 from forkan.datasets.image import load_image_dataset
 
 import sys
 import logging
 
 logger = logging.getLogger(__name__)
+model_checkpoint_path = weights_path + '/object_rec/'
 
 MODEL2ABR = {
     'inceptionresnetv2': 'IR2',
@@ -112,9 +114,9 @@ train_datagen.fit(x_train)
 test_datagen.fit(x_test)
 
 # Save the model according to the conditions
-checkpoint = ModelCheckpoint(MODEL2ABR[MODEL_NAME] + '_' + DATASET_NAME + '_E{epoch}_VA{val_acc:.2f}.hdf5',
-                             monitor='val_acc', verbose=1,save_best_only=True, save_weights_only=False,
-                             mode='auto', period=1)
+checkpoint = ModelCheckpoint(model_checkpoint_path + MODEL2ABR[MODEL_NAME] + '_' + DATASET_NAME +
+                             '_E{epoch}_VA{val_acc:.2f}.hdf5',monitor='val_acc', verbose=1,save_best_only=True,
+                             save_weights_only=False, mode='auto', period=1)
 
 # Train the model
 model.fit_generator(
