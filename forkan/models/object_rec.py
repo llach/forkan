@@ -1,4 +1,4 @@
-from keras.applications import InceptionResNetV2
+from keras.applications import InceptionResNetV2, Xception, NASNetLarge, VGG19
 from keras.preprocessing.image import ImageDataGenerator
 from keras.models import Model
 from keras.layers import Dense, Input, Dropout, GlobalAveragePooling2D
@@ -6,13 +6,36 @@ from keras.callbacks import ModelCheckpoint
 
 from forkan.datasets.image import load_image_dataset
 
-# TODO
-# model selection
+import sys
+import logging
+
+logger = logging.getLogger(__name__)
+
+MODEL2ABR = {
+    'inceptionresnetv2': 'IR2',
+    'xception': 'XC',
+    'nasnetlarge': 'NNL',
+    'vgg19': 'vgg19',
+}
+
+MODEL2CLASS = {
+    'inceptionresnetv2': InceptionResNetV2,
+    'xception': Xception,
+    'nasnetlarge': NASNetLarge,
+    'vgg19': VGG19,
+}
+
+MODEL_NAME = 'nasnetlarge'
 
 DATASET_NAME = 'drinks8'
+TARGET_SIZE = [240, 240, 3]
 
 EPOCHS = 50
 BATCH_SIZE = 32
+
+if MODEL_NAME not in MODEL2ABR:
+    logger.critical('Model {} not available!'.format(MODEL_NAME))
+    sys.exit(1)
 
 # load and unpack dataset
 train, test, mappings = load_image_dataset(DATASET_NAME)
@@ -30,7 +53,17 @@ nb_classes = len(idx2label.keys())
 input_tensor = Input(shape=x_train.shape[1:])
 
 # create the base pre-trained model
-base_model = InceptionResNetV2(input_tensor=input_tensor, weights='imagenet', include_top=False)
+if MODEL_NAME is 'nasnetlarge':
+    # NASNETLarge weights without top has a bug when loading,
+    # so we load it with top layers and remove them afterwards
+    base_model = MODEL2CLASS[MODEL_NAME](input_tensor=input_tensor, weights='imagenet', include_top=True)
+
+    base_model.layers.pop()
+    base_model.layers.pop()
+
+else:
+    base_model = MODEL2CLASS[MODEL_NAME](input_tensor=input_tensor, weights='imagenet', include_top=False)
+
 
 # don't train the base layers we've just loaded
 for layer in base_model.layers:
@@ -42,7 +75,7 @@ x = GlobalAveragePooling2D()(base_model.output)
 # let's add a fully-connected layer
 x = Dense(1024, activation='relu')(x)
 
-#add some dropout
+# add some dropout
 x = Dropout(.25)(x)
 
 # and a logistic layer
@@ -79,8 +112,9 @@ train_datagen.fit(x_train)
 test_datagen.fit(x_test)
 
 # Save the model according to the conditions
-checkpoint = ModelCheckpoint(DATASET_NAME+'_E{epoch}_VA{val_acc:.2f}.hdf5', monitor='val_acc', verbose=1,
-                             save_best_only=True, save_weights_only=False, mode='auto', period=1)
+checkpoint = ModelCheckpoint(MODEL2ABR[MODEL_NAME] + '_' + DATASET_NAME + '_E{epoch}_VA{val_acc:.2f}.hdf5',
+                             monitor='val_acc', verbose=1,save_best_only=True, save_weights_only=False,
+                             mode='auto', period=1)
 
 # Train the model
 model.fit_generator(
