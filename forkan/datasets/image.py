@@ -17,8 +17,9 @@ def load_image_dataset(name, target_size=[240, 240, 3], test_set=0.08):
     if not os.path.isfile(dataset_file):
         folder_to_npz(prefix, name, target_size=target_size, test_set=test_set)
 
-    zip = np.load(dataset_file, encoding='latin1')
+    dataset_zip = np.load(dataset_file, encoding='latin1')
 
     logger.info('Finished loading.')
-    return (zip['x_train'], zip['y_train']), (zip['x_test'], zip['y_test']), (zip['idx2label'], zip['label2idx'])
+    return (dataset_zip['x_train'], dataset_zip['y_train']), (dataset_zip['x_test'], dataset_zip['y_test']), \
+           (dataset_zip['idx2label'], dataset_zip['label2idx'])
 
