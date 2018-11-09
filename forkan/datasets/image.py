@@ -26,7 +26,7 @@ def load_image_dataset(name, target_size=[240, 240, 3], test_set=0.08):
            (dataset_zip['idx2label'], dataset_zip['label2idx'])
 
 
-def load_unlabeled_image_dataset(name, target_size=None, test_set=None):
+def load_unlabeled_image_dataset(name, test_set=None):
 
     logger.info('Loading {} ...'.format(name))
 
@@ -35,7 +35,7 @@ def load_unlabeled_image_dataset(name, target_size=None, test_set=None):
 
     # check whether we need to generate dataset archive
     if not os.path.isfile(dataset_file):
-        folder_to_unlabeled_npz(prefix, name, target_size=target_size)
+        folder_to_unlabeled_npz(prefix, name)
 
     dataset_zip = np.load(dataset_file, encoding='latin1')
     x_train = dataset_zip['imgs']
