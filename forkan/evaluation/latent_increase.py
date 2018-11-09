@@ -8,16 +8,16 @@ from forkan.datasets import load_dataset
 from forkan.models import load_model
 from forkan import figure_path
 
-EPOCHS = 100
+EPOCHS = 150
 
 logger = logging.getLogger(__name__)
 
 # all combinations to test
 comb = [(5, 40, [1, 5]),
-        (10, 20, [2, 5]),
+        (10, 30, [2, 5]),
         (20, 17, [2, 10]),
         (40, 9, [2, 20]),
-        (80, 6, [4, 20]),
+        (80, 10, [4, 20]),
         (120, 5, [4, 30]),
         (160, 11.5, [4, 40]),
         (200, 10.2, [5, 40]),
@@ -60,7 +60,7 @@ for z_dim, beta, heat_shape in comb:
     # create & save figure
     sns.heatmap(zi, linewidth=0.5)
     plt.title('(beta) VAE: beta {}; latent {}; epochs {}'.format(beta, z_dim, EPOCHS))
-    plt.savefig('{}/zi_B{}_L{}.png'.format(figure_path, beta, z_dim))
+    plt.savefig('{}/zi_L{}_B{}.png'.format(figure_path, z_dim, beta))
 
     del model
 
