@@ -43,7 +43,7 @@ class Sigma(Callback):
 class bVAE(object):
 
     def __init__(self, input_shape, latent_dim=10, initial_bias=.1,
-                 beta=1., debug=False, plot_models=False):
+                 beta=1., debug=False, plot_models=False, print_summaries=False):
 
         self.logger = logging.getLogger(__name__)
 
@@ -149,12 +149,13 @@ class bVAE(object):
         self.epochs = None
 
         # log summaries
-        self.logger.info('################### ENCODER ###################')
-        self.encoder.summary()
-        self.logger.info('################### DECODER ###################')
-        self.decoder.summary()
-        self.logger.info('###################  MODEL  ###################')
-        self.vae.summary()
+        if print_summaries:
+            self.logger.info('################### ENCODER ###################')
+            self.encoder.summary()
+            self.logger.info('################### DECODER ###################')
+            self.decoder.summary()
+            self.logger.info('###################  MODEL  ###################')
+            self.vae.summary()
 
         if plot_models:
             plot_model(self.encoder,
@@ -171,6 +172,8 @@ class bVAE(object):
             from tensorflow.python import debug as tf_debug
             K.set_session(
                 tf_debug.TensorBoardDebugWrapperSession(tf.Session(), 'localhost:7000'))
+
+        self.logger.info('(beta) VAE with beta = {} and |z| = {}'.format(self.beta, self.latent_dim))
 
     def _sample(self, inputs):
 
@@ -222,8 +225,7 @@ class bVAE(object):
         # compile entire auto encoder
         self.vae.compile(optimizer, metrics=['accuracy'])
 
-    def fit(self, train, val=None, epochs=50, batch_size=128,
-            savefile_prefix=None, log_sigma=False):
+    def fit(self, train, val=None, epochs=50, batch_size=128, log_sigma=False):
 
 
         # save epochs for weight file name
