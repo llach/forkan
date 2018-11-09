@@ -2,6 +2,7 @@ import logging
 import sys
 
 from forkan.datasets.mnist import load_mnist
+from forkan.datasets.image import load_unlabeled_image_dataset
 from forkan.datasets.dsprites import load_dsprites, load_dsprites_one_fixed
 
 dataset_list = [
@@ -46,8 +47,15 @@ def load_dataset(dataset_name, kwargs={}):
     elif dataset_name == 'duo':
         train, val = load_dsprites(type='duo', **kwargs)
         shape = (train.shape[1:])
+    elif 'atari-' in dataset_name:
+        train, val = load_unlabeled_image_dataset(dataset_name.replace('atari-', ''), **kwargs)
+        shape = (train.shape[1:])
     else:
         logger.critical('Dataset {} not found!'.format(dataset_name))
         sys.exit(1)
 
     return train, val, shape
+
+
+if __name__ == '__main__':
+    load_dataset('atari-breakout')

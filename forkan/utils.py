@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 from keras.utils import to_categorical
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
 
 def create_dir(directory_path):
     if not os.path.isdir(directory_path):
@@ -157,5 +157,49 @@ def folder_to_npz(prefix, name, target_size, test_set):
         np.savez_compressed(file, x_train=x_train, y_train=y_train,
                             x_test=x_test, y_test=y_test,
                             idx2label=idx2label, label2idx=label2idx)
+
+    logger.info('Done!')
+
+
+def folder_to_unlabeled_npz(prefix, name, target_size):
+    logger.info('Converting {} to npz file.'.format(name))
+
+    # build dataset dir
+    dataset_dir = '{}/{}/'.format(prefix, name)
+    dataset_save = '{}/{}.npz'.format(prefix, name)
+
+    if target_size is None:
+        for _, _, file_list in os.walk(dataset_dir):
+            for file in file_list:
+                im_path = os.path.join(dataset_dir, file)
+                target_size = list(np.array(Image.open(im_path)).shape)
+                break
+            break
+
+    # iterate over class directories
+    for directory, subdir_list, file_list in os.walk(dataset_dir):
+
+        # build file path
+        file_paths = ['{}/{}'.format(directory, file_name) for file_name in file_list]
+        logger.debug('paths')
+        # load and resize image to desired input shape
+        imgs = np.array([np.reshape(Image.open(file_name).resize([target_size[0], target_size[1]]), [1] + target_size,)
+                         for file_name in file_paths], dtype=np.float16)
+        logger.debug('read')
+
+        # normalise image values
+        imgs /= 255
+
+        # randomly shuffle dataset
+        np.random.shuffle(imgs)
+
+        break
+
+    logger.info('Dataset has {} samples.'.format(imgs.shape[0]))
+    logger.info('Saving dataset ...')
+
+    # save dataset
+    with open(dataset_save, 'wb') as file:
+        np.savez_compressed(file, imgs=imgs)
 
     logger.info('Done!')
