@@ -182,7 +182,7 @@ def folder_to_unlabeled_npz(prefix, name):
         file_paths = ['{}/{}'.format(directory, file_name) for file_name in file_list]
 
         # load and resize image to desired input shape
-        imgs = np.array([np.reshape(Image.open(file_name), [1] + image_shape)
+        imgs = np.array([np.reshape(Image.open(file_name), image_shape)
                          for file_name in file_paths], dtype=np.float32)
 
         # normalise image values
