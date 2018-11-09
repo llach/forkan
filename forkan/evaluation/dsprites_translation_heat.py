@@ -33,7 +33,7 @@ f, axes = plt.subplots(1, 5, sharey=True, figsize=(16, 8))
 
 # show them heatmaps
 for r, ax in enumerate(axes.flat):
-    sns.heatmap(frames[r], ax=ax)
+    sns.heatmap(frames[r], cbar=False, ax=ax)
     ax.set_aspect('equal', 'box-forced')
     ax.set_title('z{}'.format(r))
 

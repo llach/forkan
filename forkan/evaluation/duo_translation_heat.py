@@ -26,7 +26,7 @@ x_train = np.reshape(x_train, [3, 32, 32, image_size, image_size])
 frames = np.empty([16, 16, model.latent_dim], dtype=float)
 
 # get base array
-base = x_train[0, 15, 15]
+base = x_train[0, 31, 31]
 
 for x in range(0, 32, 2):
     for y in range(0, 32, 2):
