@@ -1,0 +1,9 @@
+name: breakout
+dataset:
+  name: atari-breakout
+model:
+  name: bvae
+  beta: 30
+  latent_dim: 5
+training:
+  epochs: 300

@@ -10,7 +10,8 @@ dataset_list = [
     'translation',
     'translation_scale',
     'dsprites_one_fixed',
-    'duo'
+    'duo',
+    'atari-breakout'
 ]
 
 dataset2input_shape = {

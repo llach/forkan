@@ -7,7 +7,7 @@ from forkan.config_manager import ConfigManager
 
 logger = logging.getLogger(__name__)
 
-cm = ConfigManager('train')
+cm = ConfigManager()
 model, dataset = cm.restore_model('bvae-trans')
 
 # init array that will hold all heatmaps later

@@ -1,46 +1,51 @@
 import logging
-import forkan
 import yaml
 import sys
+import os
 
-from forkan import weights_path
+from forkan import weights_path, config_path
 from forkan.models import model_list, load_model
 from forkan.datasets import dataset_list, load_dataset, dataset2input_shape
 
 
 class ConfigManager(object):
 
-    def __init__(self, config_file, active_configs=[]):
+    def __init__(self, config_names=[]):
 
         self.logger = logging.getLogger(__name__)
 
+        self.config_names = config_names
         self.configs = []
-        self.active_configs = active_configs
-        self.config_file_name = '{}.yml'.format(config_file)
-        self.config_file_path = forkan.__file__.replace('__init__.py', '') + self.config_file_name
 
-        with open(self.config_file_path, 'r') as cf:
-            self.available_configs = [d for d in yaml.load_all(cf)]
+        for root, dirs, files in os.walk(config_path):
+            for file in files:
+                fi = os.path.abspath(os.path.join(config_path, file))
 
-        self.logger.debug('Found {} configs.'.format(len(self.available_configs)))
+                if 'yml' not in fi or 'yaml' not in fi:
+                    self.logger.debug('Skipping {}.'.format(fi))
+                    pass
 
-        # save only configs we want to use; if none, we use all
-        if len(active_configs) > 0:
-            for ac in self.active_configs:
+                self.logger.debug('Loading config {}'.format(fi))
 
-                found = False
+                with open(fi, 'r') as cf:
+                    new_configs = [d for d in yaml.load_all(cf)]
 
-                for conf in self.available_configs:
-                    if conf['name'] == ac:
-                        self.configs.append(conf)
-                        found = True
-                        break
+                configname = file.replace('.yaml', '').replace('.yml', '')
 
-                if not found:
-                    self.logger.error('Could not find config {}'.format(ac))
-                    sys.exit(1)
-        else:
-            self.configs = self.available_configs
+                # add whole config set
+                if configname in self.config_names or self.config_names == []:
+                    for c in new_configs:
+                        self.configs.append(c)
+                    pass
+
+                # select config by name
+                for c in new_configs:
+                    if c['name'] in self.config_names:
+                        self.configs.append(c)
+
+        if len(self.configs) == 0:
+            self.logger.error('{} is neither a file nor a config name.'.format(config_names))
+            sys.exit(1)
 
         self.logger.debug('Loaded {} configs.'.format(len(self.configs)))
 

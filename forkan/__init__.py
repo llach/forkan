@@ -7,6 +7,7 @@ from forkan.utils import create_dir
 
 weights_path = os.environ['HOME'] + '/.keras/forkan/weights/'
 dataset_path = os.environ['HOME'] + '/.keras/datasets/'
+config_path = os.path.dirname(os.path.abspath(__file__)) + '/configs/'
 figure_path = os.environ['HOME'] + '/.keras/forkan/figures/'
 log_file = os.environ['HOME'] + '/.keras/forkan/log.txt'
 

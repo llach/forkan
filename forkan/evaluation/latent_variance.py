@@ -18,7 +18,7 @@ dataset2zi_shape = {
 
 MODEL_NAME = 'bvae-duo'
 
-cm = ConfigManager('train')
+cm = ConfigManager()
 model, dataset = cm.restore_model(MODEL_NAME)
 
 # we only want the training set

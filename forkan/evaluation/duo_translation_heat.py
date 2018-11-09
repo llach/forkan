@@ -9,7 +9,7 @@ from forkan.datasets import load_dataset
 
 logger = logging.getLogger(__name__)
 
-cm = ConfigManager('train')
+cm = ConfigManager()
 model = cm.restore_model('bvae-duo', with_dataset=False)
 dataset = load_dataset('translation')
 
