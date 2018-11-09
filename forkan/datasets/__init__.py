@@ -1,4 +1,5 @@
 import logging
+import sys
 
 from forkan.datasets.mnist import load_mnist
 from forkan.datasets.dsprites import load_dsprites, load_dsprites_one_fixed
@@ -24,7 +25,7 @@ dataset2input_shape = {
 logger = logging.getLogger(__name__)
 
 def load_dataset(dataset_name, kwargs={}):
-    logger.info('Loading dataset {} ...'.format(dataset_name))
+    logger.debug('Loading dataset {} ...'.format(dataset_name))
 
     if dataset_name == 'mnist':
         train, val = load_mnist(**kwargs)
@@ -44,5 +45,8 @@ def load_dataset(dataset_name, kwargs={}):
     elif dataset_name == 'duo':
         train, val = load_dsprites(type='duo', **kwargs)
         shape = (train.shape[1:])
+    else:
+        logger.critical('Dataset {} not found!'.format(dataset_name))
+        sys.exit(1)
 
     return train, val, shape

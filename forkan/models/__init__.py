@@ -1,4 +1,5 @@
 import logging
+import sys
 
 from forkan.models.ae import DenseAE
 from forkan.models.bvae import bVAE
@@ -18,6 +19,9 @@ def load_model(model_name, shape, kwargs={}):
         model = DenseAE(shape, **kwargs)
     elif model_name == 'bvae':
         model = bVAE(shape, **kwargs)
+    else:
+        logger.critical('Model {} not found!'.format(model_name))
+        sys.exit(1)
 
     model.compile()
 
