@@ -1,5 +1,6 @@
 import os
 import math
+import errno
 import numpy as np
 import logging
 import matplotlib.pyplot as plt
@@ -8,6 +9,15 @@ from PIL import Image
 from keras.utils import to_categorical
 
 logger = logging.getLogger(__name__)
+
+def create_dir(directory_path):
+    if not os.path.isdir(directory_path):
+        try:
+            os.makedirs(directory_path)
+            logger.info('Creating {}'.format(directory_path))
+        except OSError as exc:
+            if exc.errno == errno.EEXIST and os.path.isdir(directory_path):
+                pass
 
 def animate_greyscale_dataset(dataset):
     '''
