@@ -8,6 +8,8 @@ from forkan.datasets import load_dataset
 from forkan.models import load_model
 from forkan import figure_path
 
+EPOCHS = 100
+
 logger = logging.getLogger(__name__)
 
 # all combinations to test
@@ -40,7 +42,7 @@ for z_dim, beta, heat_shape in comb:
     model = load_model('bvae', input_shape, kwargs={'beta': beta, 'latent_dim': z_dim})
 
     # train it!
-    model.fit(train, val, epochs=1)
+    model.fit(train, val, epochs=EPOCHS)
 
     # init array that will hold all heatmaps later
     zi = np.empty([test.shape[0], model.latent_dim], dtype=float)
@@ -57,6 +59,7 @@ for z_dim, beta, heat_shape in comb:
 
     # create & save figure
     sns.heatmap(zi, linewidth=0.5)
+    plt.title('(beta) VAE: beta {}; latent {}; epochs {}'.format(beta, z_dim, EPOCHS))
     plt.savefig('{}/zi_B{}_L{}.png'.format(figure_path, beta, z_dim))
 
     del model
