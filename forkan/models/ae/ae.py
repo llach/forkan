@@ -8,7 +8,7 @@ from forkan.utils import prune_dataset
 
 class AE(object):
 
-    def __init__(self, input_shape, latent_dim, network_type='dense'):
+    def __init__(self, input_shape, latent_dim, network='dense'):
 
         self.logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ class AE(object):
         self.input_shape = input_shape
 
         # load network
-        io, models, self.z = create_ae_network(input_shape, latent_dim, network_type=network_type)
+        io, models, self.z = create_ae_network(input_shape, latent_dim, network=network)
 
         # unpack network
         self.inputs, self.outputs = io

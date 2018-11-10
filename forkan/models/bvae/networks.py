@@ -10,7 +10,7 @@ from keras.layers import (Conv2D, Conv2DTranspose, Dense,
 logger = logging.getLogger(__name__)
 
 def create_bvae_network(model, input_shape, latent_dim,
-                        network_type='dsprites', initial_bias=0.1,):
+                        network='dsprites', initial_bias=0.1,):
     
     # define encoder input layer
     inputs = Input(shape=input_shape)
@@ -18,7 +18,7 @@ def create_bvae_network(model, input_shape, latent_dim,
     ############################################
     #####               DSPRITES           #####
     ############################################
-    if network_type == 'dsprites':
+    if network == 'dsprites':
         kernel = 4
         strides = (2, 2)
         filter = 32
@@ -111,7 +111,7 @@ def create_bvae_network(model, input_shape, latent_dim,
     ############################################
     #####                ATARI             #####
     ############################################
-    elif network_type == 'atari':
+    elif network == 'atari':
         kernel = 4
         strides = (2, 2)
         filter = 32

@@ -35,7 +35,7 @@ class Sigma(Callback):
 
 class bVAE(object):
 
-    def __init__(self, input_shape, latent_dim=10, beta=1., network_type='dsprites',
+    def __init__(self, input_shape, latent_dim=10, beta=1., network='dsprites',
                  debug=False, plot_models=False, print_summaries=False):
 
         self.logger = logging.getLogger(__name__)
@@ -50,7 +50,7 @@ class bVAE(object):
         self.epochs = None
 
         # load network
-        io, models, zs = create_bvae_network(self, input_shape, latent_dim, network_type=network_type)
+        io, models, zs = create_bvae_network(self, input_shape, latent_dim, network=network)
 
         # unpack network
         self.inputs, self.outputs = io
@@ -85,7 +85,8 @@ class bVAE(object):
             K.set_session(
                 tf_debug.TensorBoardDebugWrapperSession(tf.Session(), 'localhost:7000'))
 
-        self.logger.info('(beta) VAE with beta = {} and |z| = {}'.format(self.beta, self.latent_dim))
+        self.logger.info('(beta) VAE for {} with beta = {} and |z| = {}'.format(network, self.beta,
+                                                                                self.latent_dim))
 
     def _sample(self, inputs):
 
@@ -110,7 +111,7 @@ class bVAE(object):
 
     def save(self, dataset_name):
         dest = '{}/{}_{}_b{}_L{}_E{}.h5'.format(weights_path, self.name,dataset_name,
-                                            self.beta, self.latent_dim, self.epochs)
+                                                self.beta, self.latent_dim, self.epochs)
         self.vae.save_weights(dest, overwrite=True)
 
     def encode(self, data):

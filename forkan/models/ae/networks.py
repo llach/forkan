@@ -6,9 +6,9 @@ from keras.layers import Dense, Input
 
 logger = logging.getLogger(__name__)
 
-def create_ae_network(input_shape, latent_dim, network_type='dense'):
+def create_ae_network(input_shape, latent_dim, network='dense'):
 
-    if network_type == 'dense':
+    if network == 'dense':
         # define encoder input layer
         inputs = Input(input_shape)
     
@@ -37,7 +37,7 @@ def create_ae_network(input_shape, latent_dim, network_type='dense'):
         outputs = decoder(encoder(inputs))
         ae = Model(inputs, outputs, name='full-vae')
     else:
-        logger.critical('Network type {} does not exist for bVAE'.format(network_type))
+        logger.critical('Network {} does not exist for AE'.format(network))
         sys.exit(1)
 
     return (inputs, outputs), (encoder, decoder, ae), z
