@@ -30,12 +30,21 @@ def load_unlabeled_image_dataset(name, test_set=None):
 
     logger.info('Loading {} ...'.format(name))
 
+    atari = False
+
+    if 'atari-' in name:
+        atari = True
+        name = name.replace('atari-', '')
+
     prefix = os.environ['HOME'] + '/.keras/datasets/'
     dataset_file = '{}/{}.npz'.format(prefix, name)
 
     # check whether we need to generate dataset archive
     if not os.path.isfile(dataset_file):
-        folder_to_unlabeled_npz(prefix, name)
+        if atari:
+            folder_to_unlabeled_npz(prefix, name, target_shape=[200, 160, 3])
+        else:
+            folder_to_unlabeled_npz(prefix, name)
 
     dataset_zip = np.load(dataset_file, encoding='latin1')
     x_train = dataset_zip['imgs']

@@ -161,8 +161,11 @@ def folder_to_npz(prefix, name, target_size, test_set):
     logger.info('Done!')
 
 
-def folder_to_unlabeled_npz(prefix, name):
+def folder_to_unlabeled_npz(prefix, name, target_shape=None):
     logger.info('Converting {} to npz file.'.format(name))
+
+    if target_shape is not None:
+        logger.info('Dataset will have shape {}'.format(target_shape))
 
     # build dataset dir
     dataset_dir = '{}/{}/'.format(prefix, name)
@@ -182,8 +185,12 @@ def folder_to_unlabeled_npz(prefix, name):
         file_paths = ['{}/{}'.format(directory, file_name) for file_name in file_list]
 
         # load and resize image to desired input shape
-        imgs = np.array([np.reshape(Image.open(file_name), image_shape)
-                         for file_name in file_paths], dtype=np.float32)
+        if target_shape is None:
+            imgs = np.array([np.array(Image.open(file_name), dtype=np.float32)
+                             for file_name in file_paths], dtype=np.float32)
+        else:
+            imgs = np.array([np.array(Image.open(file_name).resize((target_shape[1], target_shape[0])), dtype=np.float32)
+                             for file_name in file_paths], dtype=np.float32)
 
         # normalise image values
         imgs /= 255

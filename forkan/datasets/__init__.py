@@ -48,7 +48,7 @@ def load_dataset(dataset_name, kwargs={}):
         train, val = load_dsprites(type='duo', **kwargs)
         shape = (train.shape[1:])
     elif 'atari-' in dataset_name:
-        train, val = load_unlabeled_image_dataset(dataset_name.replace('atari-', ''), **kwargs)
+        train, val = load_unlabeled_image_dataset(dataset_name, **kwargs)
         shape = (train.shape[1:])
     else:
         logger.critical('Dataset {} not found!'.format(dataset_name))
