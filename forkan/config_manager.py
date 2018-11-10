@@ -21,11 +21,11 @@ class ConfigManager(object):
             for file in files:
                 fi = os.path.abspath(os.path.join(config_path, file))
 
-                if 'yml' not in fi or 'yaml' not in fi:
+                if 'yml' not in fi and 'yaml' not in fi:
                     self.logger.debug('Skipping {}.'.format(fi))
-                    pass
+                    continue
 
-                self.logger.debug('Loading config {}'.format(fi))
+                self.logger.debug('Found config {}'.format(fi))
 
                 with open(fi, 'r') as cf:
                     new_configs = [d for d in yaml.load_all(cf)]
@@ -47,7 +47,7 @@ class ConfigManager(object):
             self.logger.error('{} is neither a file nor a config name.'.format(config_names))
             sys.exit(1)
 
-        self.logger.debug('Loaded {} configs.'.format(len(self.configs)))
+        self.logger.debug('Using {} configurations.'.format(len(self.configs)))
 
         # check configs after loading
         self.check()
