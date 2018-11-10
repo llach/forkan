@@ -3,6 +3,7 @@ dataset:
   name: atari-breakout
 model:
   name: bvae
+  network: atari
   beta: 33
   latent_dim: 30
 training:
