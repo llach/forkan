@@ -57,13 +57,16 @@ class bVAE(object):
         self.encoder, self.decoder, self.vae = models
         self.z_mean, self.z_log_var, self.z = zs
 
+        # make sure that input and output shapes match
+        assert self.inputs._keras_shape[1:] == self.outputs._keras_shape[1:]
+
         # log summaries
         if print_summaries:
-            self.logger.info('################### ENCODER ###################')
+            self.logger.info('ENCODER')
             self.encoder.summary()
-            self.logger.info('################### DECODER ###################')
+            self.logger.info('DECODER')
             self.decoder.summary()
-            self.logger.info('###################  MODEL  ###################')
+            self.logger.info(' MODEL')
             self.vae.summary()
 
         if plot_models:
@@ -172,7 +175,7 @@ class bVAE(object):
 if __name__ == '__main__':
 
     # get image size
-    shape = (210, 160, 3)
+    shape = (200, 160, 3)
 
     vae = bVAE(shape, latent_dim=10, beta=32,
                network_type='atari', print_summaries=True)
