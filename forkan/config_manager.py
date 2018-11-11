@@ -17,15 +17,17 @@ class ConfigManager(object):
         self.config_names = config_names
         self.configs = []
 
+        self.logger.debug('Searching for configuration files in {}'.format(config_path))
+
         for root, dirs, files in os.walk(config_path):
             for file in files:
                 fi = os.path.abspath(os.path.join(config_path, file))
 
                 if 'yml' not in fi and 'yaml' not in fi:
-                    self.logger.debug('Skipping {}.'.format(fi))
+                    self.logger.debug('Skipping {}.'.format(file))
                     continue
 
-                self.logger.debug('Found config {}'.format(fi))
+                self.logger.debug('Found {}'.format(file))
 
                 with open(fi, 'r') as cf:
                     new_configs = [d for d in yaml.load_all(cf)]
