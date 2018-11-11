@@ -91,13 +91,22 @@ class ConfigManager(object):
             # save weights
             model.save(dataset_name)
 
-    def get_config_by_name(self, name):
+    def get_config_by_name(self, config_name):
 
         for conf in self.configs:
-            if conf['name'] == name:
+            if conf['name'] == config_name:
                 return conf
 
-        self.logger.error('Config {} was not found!'.format(name))
+        self.logger.error('Config {} was not found!'.format(config_name))
+        sys.exit(1)
+
+    def get_dataset_name(self, config_name):
+
+        for conf in self.configs:
+            if conf['name'] == config_name:
+                return conf['dataset']['name']
+
+        self.logger.error('Config {} was not found!'.format(config_name))
         sys.exit(1)
 
     def restore_model(self, name, with_dataset=True):
@@ -120,6 +129,10 @@ class ConfigManager(object):
 
         model = load_model(model_name, input_shape, conf['model'])
         model.load(weights)
+
+        # restore popped values for later use
+        conf['dataset']['name'] = dataset_name
+        conf['model']['name'] = model_name
 
         if with_dataset:
             return model, (train, val)
