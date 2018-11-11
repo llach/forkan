@@ -22,6 +22,7 @@ dataset2input_shape = {
     'translation_scale': (64, 64, 1),
     'dsprites_one_fixed': (64, 64, 1),
     'duo': (64, 64, 1),
+    'atari-breakout': (200, 160, 3)
 }
 
 logger = logging.getLogger(__name__)
