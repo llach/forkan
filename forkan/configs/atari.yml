@@ -4,7 +4,18 @@ dataset:
 model:
   name: bvae
   network: atari
-  beta: 330
+  beta: 33
   latent_dim: 30
 training:
   epochs: 300
+---
+name: breakout-large
+dataset:
+  name: atari-breakout
+model:
+  name: bvae
+  network: atari
+  beta: 330
+  latent_dim: 30
+training:
+  epochs: 500
