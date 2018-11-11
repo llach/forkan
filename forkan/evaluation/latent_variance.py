@@ -14,9 +14,10 @@ dataset2zi_shape = {
     'bvae-duo-short': [2, 5],
     'bvae-large-latent': [10, 20],
     'bvae-very-large-latent': [20, 50],
+    'breakout': [3, 10],
 }
 
-MODEL_NAME = 'bvae-duo'
+MODEL_NAME = 'breakout'
 
 cm = ConfigManager()
 model, dataset = cm.restore_model(MODEL_NAME)
@@ -32,7 +33,7 @@ zi = np.empty([x_train.shape[0], model.latent_dim], dtype=float)
 
 # forward pass all samples
 for i in range(x_train.shape[0]):
-    zi[i] = np.exp(model.encode(np.reshape(x_train[i], [1, 64, 64, 1]))[1])
+    zi[i] = np.exp(model.encode(np.reshape(x_train[i], [1] + list(x_train.shape[1:])))[1])
 
 # average over all three shapes
 zi = np.mean(zi, axis=0)
