@@ -19,6 +19,13 @@ YETI
 
 - time env
 - checkpoint save & load
+
+additions:
+
+- soft update
+- dueling
+- double
+- prio?2
 """
 
 
@@ -83,8 +90,8 @@ class DQN(object):
 
             # display q_values while training
             for a_i in range(num_actions):
-                vector_summary('QT{}'.format(a_i + 1), self.target_net[:, a_i])
-                vector_summary('Q{}'.format(a_i+1), self.q_net[:, a_i])
+                scalar_summary('QTa_{}'.format(a_i + 1), tf.reduce_mean(self.target_net[:, a_i]), scope='Q-Values')
+                scalar_summary('Qa_{}'.format(a_i+1), tf.reduce_mean(self.q_net[:, a_i]), scope='Q-Values')
 
             # plot network weights
             with tf.variable_scope('weights'):
@@ -93,7 +100,7 @@ class DQN(object):
 
             # gradient histograms
             grads = self.opt.compute_gradients(self._loss(tb=False))
-            with tf.variable_scope('grads'):
+            with tf.variable_scope('gradients'):
                 for g in grads: tf.summary.histogram('{}-grad'.format(g[1].name), g[0])
 
             self.merge_op = tf.summary.merge_all()
@@ -142,8 +149,8 @@ class DQN(object):
             l = huber_loss(y - qj)
 
         if tb:
-            vector_summary('target', y)
-            vector_summary('huber-loss', l)
+            scalar_summary('target', tf.reduce_mean(y))
+            scalar_summary('huber-loss', tf.reduce_mean(l))
             tf.summary.histogram('selected_Q', qj)
 
         return l
