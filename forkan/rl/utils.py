@@ -10,12 +10,12 @@ def ls_dir(d):
     return [d for d in [os.path.join(d, f) for f in os.listdir(d)] if os.path.isdir(d)]
 
 
-def vector_summary(name, var, with_hist=False):
+def vector_summary(name, var, scope='vectors', with_hist=False):
     """
     Attach a lot of summaries to a Tensor (for TensorBoard visualization).
     Copied from TensoFlow docs, but slightly modified.
     """
-    with tf.name_scope('vectors/{}'.format(name)):
+    with tf.name_scope('{}/{}'.format(scope, name)):
         mean = tf.reduce_mean(var)
         tf.summary.scalar('mean', mean)
         with tf.name_scope('stddev'):
@@ -28,10 +28,10 @@ def vector_summary(name, var, with_hist=False):
             tf.summary.histogram('histogram', var)
 
 
-def scalar_summary(name, var):
+def scalar_summary(name, var, scope='scalars'):
     """ Adds scalar Tensor to TensorBoard visualization under scope. """
 
-    with tf.name_scope('scalars/{}'.format(name)):
+    with tf.name_scope('{}/{}'.format(scope, name)):
         tf.summary.scalar(name, var)
 
 
