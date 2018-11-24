@@ -21,13 +21,12 @@ def build_network(input_shape, num_actions, network_type='mlp', name=''):
             # add one dimension to shape
             input_shape = (None,) + input_shape
 
-            # build standard MLP
-            _input = tf.placeholder(tf.float32, shape=input_shape, name='{}/input'.format(name))
-            dense1 = tf.layers.dense(_input, 64, name='{}/dense-1'.format(name),
-                                     kernel_initializer=tf.contrib.layers.xavier_initializer())
-            dense2 = tf.layers.dense(dense1, 64, name='{}/dense-2'.format(name),
-                                     kernel_initializer=tf.contrib.layers.xavier_initializer())
-            output = tf.layers.dense(dense2, num_actions, activation=None, name='{}/output'.format(name))
+            with tf.variable_scope(name):
+                # build standard MLP
+                _input = tf.placeholder(tf.float32, shape=input_shape, name='input')
+                dense1 = tf.contrib.layers.fully_connected(_input, 24)
+                dense2 = tf.contrib.layers.fully_connected(dense1, 24)
+                output = tf.contrib.layers.fully_connected(dense2, num_actions, activation_fn=None)
 
     else:
         logger.critical('Network type {} unknown!'.format(network_type))
