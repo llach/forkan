@@ -8,8 +8,7 @@ from tabulate import tabulate
 from forkan.utils import store_args
 from forkan.schedules import LinearSchedule
 
-from forkan.rl.losses import huber_loss
-from forkan.rl.utils import vector_summary, scalar_summary, rename_latest_run, clean_dir
+from forkan.rl.utils import scalar_summary, rename_latest_run, clean_dir
 from forkan.rl.dqn.networks import build_network
 from forkan.rl.dqn.replay_buffer import ReplayBuffer
 
@@ -17,6 +16,8 @@ from forkan.rl.dqn.replay_buffer import ReplayBuffer
 """
 YETI
 
+- gradient clipping
+- target normalisation
 - time env
 - checkpoint save & load
 
@@ -32,10 +33,10 @@ additions:
 class DQN(object):
 
     @store_args
-    def __init__(self, env, network_type='mlp', max_timesteps=5e7, batch_size=32, buffer_size=1e6, eta=1e-3, gamma=0.99,
-                 final_eps=0.05, anneal_eps_until=1e6, training_start=1e5, target_update_freq=1e4, render_training=False,
-                 optimizer=tf.train.AdamOptimizer, debug=False, use_tensorboard=True, tb_dir='/tmp/tf/', rolling_n=50,
-                 reward_clipping=False, clean_tb=False):
+    def __init__(self, env, network_type='mlp', max_timesteps=5e7, batch_size=32, buffer_size=1e6, lr=1e-3, gamma=0.99,
+                 final_eps=0.05, anneal_eps_until=1e6, training_start=1e5, target_update_freq=1e4,
+                 optimizer=tf.train.AdamOptimizer, gradient_clipping=None, render_training=False, debug=False,
+                 use_tensorboard=True, tb_dir='/tmp/tf/', rolling_n=50, reward_clipping=False, clean_tb=False):
 
         self.logger = logging.getLogger(__name__)
 
@@ -43,16 +44,17 @@ class DQN(object):
         self._tb = use_tensorboard
 
         # env specific parameter
-        obs_shape = env.observation_space.shape
-        num_actions = env.action_space.n
+        self.obs_shape = env.observation_space.shape
+        self.num_actions = env.action_space.n
 
         # tf scopes
         self.Q_SCOPE = 'q_network'
         self.TARGET_SCOPE = 'target_network'
 
         # init q network, target network, replay buffer
-        self.q_net, self.q_in = build_network(obs_shape, num_actions, network_type=network_type, name=self.Q_SCOPE)
-        self.target_net, self.target_in = build_network(obs_shape, num_actions, network_type=network_type,
+        self.q_net, self.q_in = build_network(self.obs_shape, self.num_actions, network_type=network_type,
+                                              name=self.Q_SCOPE)
+        self.target_net, self.target_in = build_network(self.obs_shape, self.num_actions, network_type=network_type,
                                                         name=self.TARGET_SCOPE)
         self.replay_buffer = ReplayBuffer(buffer_size)
 
@@ -63,14 +65,23 @@ class DQN(object):
         # define additional variables used in loss function
         self._L_r = tf.placeholder(tf.float32, (None,), name='loss_rewards')
         self._L_a = tf.placeholder(tf.int32, (None,), name='loss_actions')
-        self._L_d_inv = tf.placeholder(tf.float32, (None,), name='loss_inverted_dones')
+        self._L_d = tf.placeholder(tf.float32, (None,), name='loss_dones')
 
         # epsilon schedule
         self.eps = LinearSchedule(max_t=self.anneal_eps_until, final=final_eps)
 
         # init optimizer with loss to minimize
-        self.opt = self.optimizer(learning_rate=self.eta)
-        self.train_op = self.opt.minimize(self._loss(), var_list=self.q_net_vars)
+        self.opt = self.optimizer(self.lr)
+        self.gradients = self.opt.compute_gradients(self._loss(), var_list=self.q_net_vars)
+
+        # clip gradients
+        if self.gradient_clipping is not None:
+            for idx, (grad, var) in enumerate(self.gradients):
+                if grad is not None:
+                    self.gradients[idx] = (tf.clip_by_norm(grad, self.gradient_clipping), var)
+
+        # create training op
+        self.train_op = self.opt.apply_gradients(self.gradients)
 
         # global tf.Session and Graph init
         self.sess = tf.Session()
@@ -89,7 +100,7 @@ class DQN(object):
             scalar_summary('reward', self.rew_ph)
 
             # display q_values while training
-            for a_i in range(num_actions):
+            for a_i in range(self.num_actions):
                 scalar_summary('QTa_{}'.format(a_i + 1), tf.reduce_mean(self.target_net[:, a_i]), scope='Q-Values')
                 scalar_summary('Qa_{}'.format(a_i+1), tf.reduce_mean(self.q_net[:, a_i]), scope='Q-Values')
 
@@ -99,9 +110,8 @@ class DQN(object):
                 for tv in self.target_net_vars: tf.summary.histogram('{}'.format(tv.name), tv)
 
             # gradient histograms
-            grads = self.opt.compute_gradients(self._loss(tb=False))
             with tf.variable_scope('gradients'):
-                for g in grads: tf.summary.histogram('{}-grad'.format(g[1].name), g[0])
+                for g in self.gradients: tf.summary.histogram('{}-grad'.format(g[1].name), g[0])
 
             self.merge_op = tf.summary.merge_all()
 
@@ -135,25 +145,25 @@ class DQN(object):
 
         self.sess.run(ops)
 
-    def _loss(self, tb=True):
+    def _loss(self):
         """ Defines loss as layed out in the original Nature paper """
 
         with tf.variable_scope('loss'):
+
             # calculate target
-            y = self._L_r + (self.gamma * self._L_d_inv * tf.reduce_max(self.target_net, axis=1))
+            y = self._L_r + (self.gamma * (1.0 - self._L_d) * tf.reduce_max(self.target_net, axis=1))
 
             # select q value of taken action
-            qj = tf.gather(self.q_net, self._L_a, axis=1)
+            qj = tf.reduce_sum(self.q_net * tf.one_hot(self._L_a, self.num_actions), 1)
 
-            # apply huber loss TODO try tf.losses.huber_loss as comparison
-            l = huber_loss(y - qj)
+            loss = tf.losses.huber_loss(y, qj)
 
-        if tb:
+        if self._tb:
             scalar_summary('target', tf.reduce_mean(y))
-            scalar_summary('huber-loss', tf.reduce_mean(l))
+            scalar_summary('huber-loss', tf.reduce_mean(loss))
             tf.summary.histogram('selected_Q', qj)
 
-        return l
+        return tf.reduce_mean(loss)
 
     def learn(self):
         """ Learns Q function for a given amount of timesteps """
@@ -216,26 +226,25 @@ class DQN(object):
                 # small episode results table
                 if done:
                     result_table = [
+                        ['t', t],
+                        ['episode', len(episode_rewards)],
                         ['reward', episode_rewards[-1]],
                         ['epsilon', epsilon]
                     ]
-                    print('    EPISODE {}\n{}'.format(len(episode_rewards), tabulate(result_table)))
+                    print('\n{}'.format(tabulate(result_table)))
 
                 o, a, r, no, d = self.replay_buffer.sample(self.batch_size)
-
-                # invert dones => 0 for done will zero out gamma * Q(o_t+1, a')
-                d_inv = np.array([1. if x == 0. else 0. for x in d])
 
                 # collect summaries if needed or just train
                 if self._tb:
                     summary, _ = self.sess.run([self.merge_op, self.train_op],
                                                feed_dict={self.target_in: no, self.q_in: o, self._L_r: r, self._L_a: a,
-                                                          self._L_d_inv: d_inv, self.eps_ph: epsilon,
+                                                          self._L_d: d, self.eps_ph: epsilon,
                                                           self.rew_ph: rr})
                     self.writer.add_summary(summary, t)
                 else:
                     self.sess.run(self.train_op, feed_dict={self.target_in: no, self.q_in: o, self._L_r: r,
-                                                            self._L_a: a, self._L_d_inv: d_inv})
+                                                            self._L_a: a, self._L_d: d})
 
                 # sync target network every C steps
                 if (t - self.training_start) % self.target_update_freq == 0:
@@ -253,6 +262,7 @@ if __name__ == '__main__':
     import gym
 
     env = gym.make('CartPole-v0')
-    agent = DQN(env, buffer_size=5e3, training_start=5e3, target_update_freq=1e2, anneal_eps_until=1e4,
-                eta=15e-3, clean_tb=True)
+    agent = DQN(env, buffer_size=1e5, max_timesteps=1e5, training_start=1e1, target_update_freq=5e2, anneal_eps_until=15e3,
+                lr=1e-2, gamma=.99, clean_tb=True, batch_size=32)
+    # gradient_clipping=10, normalize_target=True,
     agent.learn()
