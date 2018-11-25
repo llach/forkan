@@ -83,6 +83,13 @@ class DQN(object):
         # create training op
         self.train_op = self.opt.apply_gradients(self.gradients)
 
+        # update_target_fn will be called periodically to copy Q network to target Q network
+        self.update_target_expr = []
+        for var, var_target in zip(sorted(self.q_net_vars, key=lambda v: v.name),
+                                   sorted(self.target_net_vars, key=lambda v: v.name)):
+            self.update_target_expr.append(var_target.assign(var))
+        self.update_target_expr = tf.group(*self.update_target_expr)
+
         # global tf.Session and Graph init
         self.sess = tf.Session()
 
@@ -126,24 +133,13 @@ class DQN(object):
         # init variables etc.
         self._init_tf()
 
-        # synchronize networks before learning
-        self._update_target()
+        # sync networks before training
+        self.sess.run(self.update_target_expr)
 
     def _init_tf(self):
         """ Initializes tensorflow stuff """
 
         self.sess.run(tf.global_variables_initializer())
-
-    def _update_target(self):
-        """ Synchronises weights from q network to target network """
-
-        self.logger.debug('Updating target network')
-
-        ops = []
-        for q_var, t_var in zip(self.q_net_vars, self.target_net_vars):
-           ops.append(t_var.assign(q_var))
-
-        self.sess.run(ops)
 
     def _loss(self):
         """ Defines loss as layed out in the original Nature paper """
@@ -195,9 +191,6 @@ class DQN(object):
             if self.reward_clipping:
                 reward = 1 if reward > 0 else -1 if reward < 0 else 0
 
-            # append current rewards to episode reward series
-            episode_reward_series[-1].append(reward)
-
             # store new transition
             self.replay_buffer.add(obs, action, reward, new_obs, float(done))
 
@@ -248,7 +241,7 @@ class DQN(object):
 
                 # sync target network every C steps
                 if (t - self.training_start) % self.target_update_freq == 0:
-                    self._update_target()
+                    self.sess.run(self.update_target_expr)
 
         # total reward of last (possibly interrupted) episode
         episode_rewards.append(np.sum(episode_reward_series[-1]))
