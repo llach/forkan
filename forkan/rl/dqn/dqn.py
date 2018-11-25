@@ -197,6 +197,9 @@ class DQN(object):
             # t + 1 -> t
             obs = new_obs
 
+            # append current rewards to episode reward series
+            episode_reward_series[-1].append(reward)
+
             if self.render_training:
                 self.env.render()
 
@@ -221,7 +224,7 @@ class DQN(object):
                     result_table = [
                         ['t', t],
                         ['episode', len(episode_rewards)],
-                        ['reward', episode_rewards[-1]],
+                        ['mean_reward [20]', np.mean(episode_rewards[-20:])],
                         ['epsilon', epsilon]
                     ]
                     print('\n{}'.format(tabulate(result_table)))
