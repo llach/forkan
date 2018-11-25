@@ -258,7 +258,14 @@ if __name__ == '__main__':
     import gym
 
     env = gym.make('CartPole-v0')
-    agent = DQN(env, buffer_size=1e5, max_timesteps=1e5, training_start=1e1, target_update_freq=5e2, anneal_eps_until=15e3,
-                lr=1e-2, gamma=.99, clean_tb=True, batch_size=32)
-    # gradient_clipping=10, normalize_target=True,
+    agent = DQN(env, buffer_size=50000,
+                max_timesteps=100000,
+                training_start=1000,
+                target_update_freq=500,
+                anneal_eps_until=10000,
+                lr=5e-4,
+                gamma=1.,
+                clean_tb=True,
+                batch_size=32)
+
     agent.learn()
