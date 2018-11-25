@@ -5,7 +5,6 @@ import tensorflow as tf
 from tensorflow.python import debug as tf_debug
 from tabulate import tabulate
 
-from forkan.utils import store_args
 from forkan.schedules import LinearSchedule
 
 from forkan.rl.utils import scalar_summary, rename_latest_run, clean_dir
@@ -16,8 +15,6 @@ from forkan.rl.dqn.replay_buffer import ReplayBuffer
 """
 YETI
 
-- gradient clipping
-- target normalisation
 - time env
 - checkpoint save & load
 
@@ -26,19 +23,62 @@ additions:
 - soft update
 - dueling
 - double
-- prio?2
+- prioritized replay
+
 """
 
 
 class DQN(object):
 
-    @store_args
-    def __init__(self, env, network_type='mlp', max_timesteps=5e7, batch_size=32, buffer_size=1e6, lr=1e-3, gamma=0.99,
-                 final_eps=0.05, anneal_eps_until=1e6, training_start=1e5, target_update_freq=1e4,
-                 optimizer=tf.train.AdamOptimizer, gradient_clipping=None, render_training=False, debug=False,
-                 use_tensorboard=True, tb_dir='/tmp/tf/', rolling_n=50, reward_clipping=False, clean_tb=False):
+    def __init__(self,
+                 env,
+                 network_type='mlp',
+                 total_timesteps=5e7,
+                 batch_size=32,
+                 lr=1e-3,
+                 gamma=0.99,
+                 buffer_size=1e6,
+                 final_eps=0.05,
+                 explore_fraction=0.1,
+                 training_start=1e5,
+                 target_update_freq=1e4,
+                 optimizer=tf.train.AdamOptimizer,
+                 gradient_clipping=None,
+                 reward_clipping=False,
+                 rolling_n=20,
+                 render_training=False,
+                 debug=False,
+                 use_tensorboard=True,
+                 tb_dir='/tmp/tf/',
+                 clean_tb=False):
 
+        self.env = env
         self.logger = logging.getLogger(__name__)
+
+        # basic DQN parameters
+        self.total_timesteps = total_timesteps
+        self.batch_size = batch_size
+        self.lr = lr
+        self.gamma = gamma
+        self.training_start = training_start
+        self.target_update_freq = target_update_freq
+
+        # timestep epsilon reaches its final value
+        self.anneal_eps_until = int(total_timesteps * explore_fraction)
+
+        # tf.Optimizer
+        self.optimizer = optimizer
+
+        # additional configuration options
+        self.gradient_clipping = gradient_clipping
+        self.render_training = render_training
+        self.reward_clipping = reward_clipping
+
+        # misc
+        self.debug = debug
+        self.tb_dir = tb_dir
+        self.rolling_n = rolling_n
+        self.clean_tb = clean_tb
 
         # whether to use tensorboard or not
         self._tb = use_tensorboard
@@ -172,9 +212,9 @@ class DQN(object):
         episode_rewards = []
 
         self.logger.info('Starting Exploration')
-        for t in range(int(self.max_timesteps)):
+        for t in range(int(self.total_timesteps)):
 
-            # decide on action either by policy or chose a random one TODO decrease eps after training start?
+            # decide on action either by policy or chose a random one
             epsilon = self.eps.value(t)
             _rand = np.random.choice([True, False], p=[epsilon, 1-epsilon])
             if _rand:
@@ -224,7 +264,7 @@ class DQN(object):
                     result_table = [
                         ['t', t],
                         ['episode', len(episode_rewards)],
-                        ['mean_reward [20]', np.mean(episode_rewards[-20:])],
+                        ['mean_reward [20]', np.mean(episode_rewards[-self.rolling_n:])],
                         ['epsilon', epsilon]
                     ]
                     print('\n{}'.format(tabulate(result_table)))
@@ -258,11 +298,12 @@ if __name__ == '__main__':
     import gym
 
     env = gym.make('CartPole-v0')
-    agent = DQN(env, buffer_size=50000,
-                max_timesteps=100000,
+    agent = DQN(env,
+                buffer_size=50000,
+                total_timesteps=100000,
                 training_start=1000,
                 target_update_freq=500,
-                anneal_eps_until=10000,
+                explore_fraction=0.1,
                 lr=5e-4,
                 gamma=1.,
                 clean_tb=True,
