@@ -6,23 +6,22 @@ from forkan.config_manager import ConfigManager
 from forkan.datasets import dataset2input_shape
 from forkan.utils import create_dir
 
-MODEL_NAME = 'bvae-duo'
+MODEL_NAME = 'breakout'
 
 cm = ConfigManager()
 model = cm.restore_model(MODEL_NAME, with_dataset=False)
 
-idx = 1
+idx = 13
 
 saving = True
-save_path = os.environ['HOME'] + '/.keras/forkan/figures/z_{}/'.format(idx)
+save_path = os.environ['HOME'] + '/.keras/forkan/figures/{}/z_{}/'.format(MODEL_NAME, idx)
 create_dir(save_path)
 
 np.random.seed(1)
 
-latents = np.random.normal(0, 1, (model.latent_dim))
+latents = np.random.normal(0, 1, model.latent_dim)
 
-i = 0
-for r in np.linspace(-3, 3, 16):
+for i, r in enumerate(np.linspace(-3, 3, 16)):
     latents[idx] = r
 
     img = model.decode(np.reshape(latents, [1, model.latent_dim]))
