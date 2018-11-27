@@ -13,5 +13,6 @@ setup(name='forkan',
                         'gym>=0.10.9',
                         'coloredlogs>=10.0',
                         'matplotlib>=3.0.0',
-                        'keras>=2.2.4'],
+                        'keras>=2.2.4',
+                        'baselines'],
       packages=find_packages())

@@ -5,11 +5,11 @@ import tensorflow as tf
 from tensorflow.python import debug as tf_debug
 from tabulate import tabulate
 
-from forkan.schedules import LinearSchedule
+from baselines.common.schedules import LinearSchedule
+from baselines.deepq.replay_buffer import ReplayBuffer
 
 from forkan.rl.utils import scalar_summary, rename_latest_run, clean_dir
 from forkan.rl.dqn.networks import build_network
-from forkan.rl.dqn.replay_buffer import ReplayBuffer
 
 
 """
@@ -17,6 +17,8 @@ YETI
 
 - time env
 - checkpoint save & load
+- solved_callback
+- tensorboard directory suffix
 
 additions:
 
@@ -64,7 +66,7 @@ class DQN(object):
         self.target_update_freq = target_update_freq
 
         # timestep epsilon reaches its final value
-        self.anneal_eps_until = int(total_timesteps * explore_fraction)
+        self.schedule_timesteps = int(total_timesteps * explore_fraction)
 
         # tf.Optimizer
         self.optimizer = optimizer
@@ -108,7 +110,7 @@ class DQN(object):
         self._L_d = tf.placeholder(tf.float32, (None,), name='loss_dones')
 
         # epsilon schedule
-        self.eps = LinearSchedule(max_t=self.anneal_eps_until, final=final_eps)
+        self.eps = LinearSchedule(self.schedule_timesteps, final_p=final_eps)
 
         # init optimizer with loss to minimize
         self.opt = self.optimizer(self.lr)
