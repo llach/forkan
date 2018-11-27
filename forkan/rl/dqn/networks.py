@@ -16,17 +16,15 @@ logger = logging.getLogger(__name__)
 def build_network(input_shape, num_actions, network_type='mlp', name=''):
 
     if network_type is 'mlp':
-        with tf.name_scope(name):
+        # add one dimension to shape
+        input_shape = (None,) + input_shape
 
-            # add one dimension to shape
-            input_shape = (None,) + input_shape
-
-            with tf.variable_scope(name):
-                # build standard MLP
-                _input = tf.placeholder(tf.float32, shape=input_shape, name='input')
-                dense1 = tf.contrib.layers.fully_connected(_input, 24)
-                dense2 = tf.contrib.layers.fully_connected(dense1, 24)
-                output = tf.contrib.layers.fully_connected(dense2, num_actions, activation_fn=None)
+        with tf.variable_scope(name):
+            # build standard MLP
+            _input = tf.placeholder(tf.float32, shape=input_shape, name='input')
+            dense1 = tf.contrib.layers.fully_connected(_input, 24)
+            dense2 = tf.contrib.layers.fully_connected(dense1, 24)
+            output = tf.contrib.layers.fully_connected(dense2, num_actions, activation_fn=None)
 
     else:
         logger.critical('Network type {} unknown!'.format(network_type))
