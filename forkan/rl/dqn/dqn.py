@@ -15,7 +15,6 @@ from forkan.rl.dqn.networks import build_network
 """
 YETI
 
-- time env
 - checkpoint save & load
 - solved_callback
 - tensorboard directory suffix
@@ -297,9 +296,9 @@ class DQN(object):
 
 
 if __name__ == '__main__':
-    import gym
+    from forkan.rl import make
+    env = make('CartPole-v0')
 
-    env = gym.make('CartPole-v0')
     agent = DQN(env,
                 buffer_size=50000,
                 total_timesteps=100000,
