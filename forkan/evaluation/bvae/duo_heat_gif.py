@@ -7,7 +7,7 @@ import os
 from scipy.ndimage.measurements import label
 from forkan.config_manager import ConfigManager
 from forkan.datasets import load_dataset
-from forkan.utils import create_dir
+from forkan.common.utils import create_dir
 
 logger = logging.getLogger(__name__)
 

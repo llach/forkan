@@ -10,7 +10,7 @@ from keras.utils import plot_model
 from keras import backend as K
 
 from forkan import weights_path
-from forkan.utils import prune_dataset
+from forkan.common.utils import prune_dataset
 from forkan.models.bvae.networks import create_bvae_network
 
 class Sigma(Callback):

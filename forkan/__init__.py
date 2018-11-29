@@ -3,7 +3,7 @@ import logging
 import coloredlogs
 
 from logging.config import dictConfig
-from forkan.utils import create_dir
+from forkan.common.utils import create_dir
 
 weights_path = os.environ['HOME'] + '/.keras/forkan/weights/'
 dataset_path = os.environ['HOME'] + '/.keras/datasets/'

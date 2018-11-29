@@ -3,7 +3,7 @@ import math
 import logging
 import numpy as np
 
-from forkan.utils import folder_to_npz, folder_to_unlabeled_npz
+from forkan.common.utils import folder_to_npz, folder_to_unlabeled_npz
 
 logger = logging.getLogger(__name__)
 

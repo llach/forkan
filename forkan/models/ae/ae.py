@@ -3,7 +3,7 @@ import logging
 from keras.losses import mse
 from forkan.models.ae.networks import create_ae_network
 from forkan.datasets.mnist import load_mnist
-from forkan.utils import prune_dataset
+from forkan.common.utils import prune_dataset
 
 
 class AE(object):

@@ -4,7 +4,7 @@ import os
 
 from forkan.config_manager import ConfigManager
 from forkan.datasets import dataset2input_shape
-from forkan.utils import create_dir
+from forkan.common.utils import create_dir
 
 MODEL_NAME = 'breakout'
 
