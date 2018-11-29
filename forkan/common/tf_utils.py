@@ -24,4 +24,3 @@ def scalar_summary(name, var, scope='scalars'):
 
     with tf.name_scope('{}/{}'.format(scope, name)):
         tf.summary.scalar(name, var)
-
