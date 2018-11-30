@@ -1,8 +1,8 @@
 name: vae-test
 dataset:
-  name: translation
+  type: translation
 model:
-  name: vae
+  type: vae
   beta: 30
   latent_dim: 5
 training:
@@ -10,9 +10,9 @@ training:
 ---
 name: vae-dsprites
 dataset:
-  name: dsprites
+  type: dsprites
 model:
-  name: vae
+  type: vae
   beta: 35
   latent_dim: 5
 training:
@@ -20,9 +20,9 @@ training:
 ---
 name: vae-duo
 dataset:
-  name: duo
+  type: duo
 model:
-  name: vae
+  type: vae
   beta: 35
   latent_dim: 10
 training:
@@ -30,9 +30,9 @@ training:
 ---
 name: vae-duo-large
 dataset:
-  name: duo
+  type: duo
 model:
-  name: vae
+  type: vae
   beta: 100
   latent_dim: 10
 training:
@@ -40,9 +40,9 @@ training:
 ---
 name: vae-duo-short
 dataset:
-  name: duo
+  type: duo
 model:
-  name: vae
+  type: vae
   beta: 35
   latent_dim: 10
 training:
@@ -50,9 +50,9 @@ training:
 ---
 name: vae-trans
 dataset:
-  name: translation
+  type: translation
 model:
-  name: vae
+  type: vae
   beta: 30
   latent_dim: 5
 training:
@@ -60,9 +60,9 @@ training:
 ---
 name: vae-trans-scale
 dataset:
-  name: translation_scale
+  type: translation_scale
 model:
-  name: vae
+  type: vae
   beta: 30
   latent_dim: 5
 training:
@@ -70,9 +70,9 @@ training:
 ---
 name: vae-trans-scale-short
 dataset:
-  name: translation_scale
+  type: translation_scale
 model:
-  name: vae
+  type: vae
   beta: 30
   latent_dim: 5
 training:
@@ -80,9 +80,9 @@ training:
 ---
 name: vae-large-latent
 dataset:
-  name: translation_scale
+  type: translation_scale
 model:
-  name: vae
+  type: vae
   beta: 20
   latent_dim: 200
 training:
@@ -90,9 +90,9 @@ training:
 ---
 name: vae-very-large-latent
 dataset:
-  name: translation_scale
+  type: translation_scale
 model:
-  name: vae
+  type: vae
   beta: 8
   latent_dim: 1000
 training:

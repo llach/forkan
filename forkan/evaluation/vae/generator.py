@@ -31,7 +31,7 @@ for i, r in enumerate(np.linspace(-3, 3, 16)):
     latents[idx] = r
 
     img = model.decode(np.reshape(latents, [1, model.latent_dim]))
-    target_shape = dataset2input_shape[cm.get_dataset_name(MODEL_NAME)]
+    target_shape = dataset2input_shape[cm.get_dataset_type(MODEL_NAME)]
 
     if target_shape[-1] == 1:
         target_shape = target_shape[:-1]

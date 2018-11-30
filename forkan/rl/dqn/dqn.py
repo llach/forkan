@@ -59,6 +59,9 @@ class DQN(object):
                  ):
         """
 
+        Implementation of the Deep Q Learning (DQN) algorithm formualted by Mnih et. al.
+        Contains some well known improvements over the vanilla DQN.
+
         Parameters
         ----------
         env: gym.Environment
@@ -229,7 +232,7 @@ class DQN(object):
         self.eps = LinearSchedule(self.schedule_timesteps, final_p=final_eps)
 
         # init optimizer
-        self.opt = self.optimizer(self.lr)
+        self.opt = self.optimizer(float(self.lr))
 
         # specify loss function, only include Q network variables for gradient computation
         self.gradients = self.opt.compute_gradients(self._loss(), var_list=self.q_net_vars)
@@ -522,19 +525,8 @@ class DQN(object):
 
 
 if __name__ == '__main__':
-    from forkan.rl import make
-    env = make('CartPole-v0')
+    from forkan import ConfigManager
 
-    agent = DQN(env,
-                buffer_size=50000,
-                total_timesteps=100000,
-                training_start=1000,
-                target_update_freq=500,
-                exploration_fraction=0.1,
-                lr=5e-4,
-                gamma=1.,
-                batch_size=32,
-                clean_tensorboard_runs=True,
-                )
+    cm = ConfigManager(['dqn-cart'])
+    cm.exec()
 
-    agent.learn()

@@ -44,3 +44,6 @@ coloredlogs.install(level='DEBUG', fmt=fmt, datefmt=datefmt)
 
 for d in [weights_path, dataset_path, figure_path]:
     create_dir(d)
+
+# import files and from files that depend on variables defined above after they are defined
+from forkan.common.config_manager import ConfigManager
