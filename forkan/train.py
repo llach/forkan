@@ -1,7 +1,6 @@
 import argparse
-import sys
 
-from forkan.config_manager import ConfigManager
+from forkan.common.config_manager import ConfigManager
 
 parser = argparse.ArgumentParser()
 parser.add_argument('configs', nargs='*', type=str, default=None)

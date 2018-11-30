@@ -8,7 +8,27 @@ from forkan.common.utils import prune_dataset
 
 class AE(object):
 
-    def __init__(self, input_shape, latent_dim, network='dense'):
+    def __init__(self,
+                 input_shape,
+                 latent_dim,
+                 network='dense'):
+        """
+
+        Basic implementation af an Auto Encoder using Keras.
+
+        Parameters
+        ----------
+
+        input_shape : tuple
+            shape of desired input as tuple
+
+        latent_dim : int
+            number of nodes in bottleneck layer aka size of latent dimesion
+
+        network : str
+            string identifier for network architecture as defined in 'networks.py'
+
+        """
 
         self.logger = logging.getLogger(__name__)
 

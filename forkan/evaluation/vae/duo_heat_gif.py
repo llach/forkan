@@ -5,9 +5,14 @@ import numpy as np
 import os
 
 from scipy.ndimage.measurements import label
-from forkan.config_manager import ConfigManager
+from forkan.common.config_manager import ConfigManager
 from forkan.datasets import load_dataset
 from forkan.common.utils import create_dir
+
+"""
+For every position of object 1, the activation heatmaps for every position of obejct 2 are computed
+and saved as an image. Positions where objects overlap are assigned -1 as activation.
+"""
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +20,7 @@ save_path = os.environ['HOME'] + '/.keras/forkan/figures/duo_heat/'
 create_dir(save_path)
 
 cm = ConfigManager()
-model = cm.restore_model('bvae-duo', with_dataset=False)
+model = cm.restore_model('vae-duo', with_dataset=False)
 dataset = load_dataset('translation')
 
 # we only want the training set

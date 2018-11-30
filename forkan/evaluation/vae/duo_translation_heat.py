@@ -4,13 +4,16 @@ import seaborn as sns
 import numpy as np
 
 from scipy.ndimage.measurements import label
-from forkan.config_manager import ConfigManager
+from forkan.common.config_manager import ConfigManager
 from forkan.datasets import load_dataset
 
+"""
+Activation heatmap for duo translation dsprites dataset where one object position is kept fixed.
+"""
 logger = logging.getLogger(__name__)
 
 cm = ConfigManager()
-model = cm.restore_model('bvae-duo', with_dataset=False)
+model = cm.restore_model('vae-duo', with_dataset=False)
 dataset = load_dataset('translation')
 
 # we only want the training set

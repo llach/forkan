@@ -2,9 +2,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-from forkan.config_manager import ConfigManager
+from forkan.common.config_manager import ConfigManager
 from forkan.datasets import dataset2input_shape
 from forkan.common.utils import create_dir
+
+
+"""
+Decoder of AE like model is run where all z_i but one are kept fixed. The variable z_i takes on
+values from a certain range and output images are generated.
+"""
 
 MODEL_NAME = 'breakout'
 

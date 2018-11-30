@@ -1,98 +1,98 @@
-name: bvae-test
+name: vae-test
 dataset:
   name: translation
 model:
-  name: bvae
+  name: vae
   beta: 30
   latent_dim: 5
 training:
   epochs: 1
 ---
-name: bvae-dsprites
+name: vae-dsprites
 dataset:
   name: dsprites
 model:
-  name: bvae
+  name: vae
   beta: 35
   latent_dim: 5
 training:
   epochs: 500
 ---
-name: bvae-duo
+name: vae-duo
 dataset:
   name: duo
 model:
-  name: bvae
+  name: vae
   beta: 35
   latent_dim: 10
 training:
   epochs: 500
 ---
-name: bvae-duo-large
+name: vae-duo-large
 dataset:
   name: duo
 model:
-  name: bvae
+  name: vae
   beta: 100
   latent_dim: 10
 training:
   epochs: 500
 ---
-name: bvae-duo-short
+name: vae-duo-short
 dataset:
   name: duo
 model:
-  name: bvae
+  name: vae
   beta: 35
   latent_dim: 10
 training:
   epochs: 100
 ---
-name: bvae-trans
+name: vae-trans
 dataset:
   name: translation
 model:
-  name: bvae
+  name: vae
   beta: 30
   latent_dim: 5
 training:
   epochs: 500
 ---
-name: bvae-trans-scale
+name: vae-trans-scale
 dataset:
   name: translation_scale
 model:
-  name: bvae
+  name: vae
   beta: 30
   latent_dim: 5
 training:
   epochs: 500
 ---
-name: bvae-trans-scale-short
+name: vae-trans-scale-short
 dataset:
   name: translation_scale
 model:
-  name: bvae
+  name: vae
   beta: 30
   latent_dim: 5
 training:
   epochs: 100
 ---
-name: bvae-large-latent
+name: vae-large-latent
 dataset:
   name: translation_scale
 model:
-  name: bvae
+  name: vae
   beta: 20
   latent_dim: 200
 training:
   epochs: 500
 ---
-name: bvae-very-large-latent
+name: vae-very-large-latent
 dataset:
   name: translation_scale
 model:
-  name: bvae
+  name: vae
   beta: 8
   latent_dim: 1000
 training:

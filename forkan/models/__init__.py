@@ -2,13 +2,13 @@ import logging
 import sys
 
 from forkan.models.ae.ae import AE
-from forkan.models.bvae import bVAE
+from forkan.models.vae import VAE
 
 logger = logging.getLogger(__name__)
 
 model_list = [
     'ae',
-    'bvae'
+    'vae'
 ]
 
 
@@ -17,8 +17,8 @@ def load_model(model_name, shape, kwargs={}):
 
     if model_name == 'ae':
         model = AE(shape, **kwargs)
-    elif model_name == 'bvae':
-        model = bVAE(shape, **kwargs)
+    elif model_name == 'vae':
+        model = VAE(shape, **kwargs)
     else:
         logger.critical('Model {} not found!'.format(model_name))
         sys.exit(1)

@@ -8,6 +8,11 @@ from forkan.datasets import load_dataset
 from forkan.models import load_model
 from forkan import figure_path
 
+
+"""
+Small training script that trains several beta VAEs with different 
+beta and |z|. Heatmaps are computed that show variance of the z_i. 
+"""
 EPOCHS = 150
 
 logger = logging.getLogger(__name__)
@@ -39,7 +44,7 @@ for z_dim, beta, heat_shape in comb:
 for z_dim, beta, heat_shape in comb:
 
     # load model
-    model = load_model('bvae', input_shape, kwargs={'beta': beta, 'latent_dim': z_dim})
+    model = load_model('vae', input_shape, kwargs={'beta': beta, 'latent_dim': z_dim})
 
     # train it!
     model.fit(train, val, epochs=EPOCHS)

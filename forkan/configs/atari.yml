@@ -2,7 +2,7 @@ name: breakout
 dataset:
   name: atari-breakout
 model:
-  name: bvae
+  name: vae
   network: atari
   beta: 33
   latent_dim: 30
@@ -13,7 +13,7 @@ name: breakout-large
 dataset:
   name: atari-breakout
 model:
-  name: bvae
+  name: vae
   network: atari
   beta: 330
   latent_dim: 30

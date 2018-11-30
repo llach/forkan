@@ -3,20 +3,26 @@ import logging
 import seaborn as sns; sns.set()
 import numpy as np
 
-from forkan.config_manager import ConfigManager
+from forkan.common.config_manager import ConfigManager
+
+
+"""
+Runs model on 1024 different training examples and 
+plots the mean variance of the z_i as a bar plot.
+"""
 
 logger = logging.getLogger(__name__)
 
 # model name to array: [NUM_PLOTS, NUM_ZI_PER_PLOT]
 dataset2plot_shape = {
-    'bvae-trans': [1, 5],
-    'bvae-trans-scale': [1, 5],
-    'bvae-duo': [1, 10],
-    'bvae-duo-short': [1, 10],
+    'vae-trans': [1, 5],
+    'vae-trans-scale': [1, 5],
+    'vae-duo': [1, 10],
+    'vae-duo-short': [1, 10],
     'breakout': [2, 15],
 }
 
-MODEL_NAME = 'breakout'
+MODEL_NAME = 'vae-trans'
 
 # threshold for coloring bars red
 COL_THRESH = 0.8

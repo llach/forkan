@@ -11,9 +11,13 @@ from keras import backend as K
 
 from forkan import weights_path
 from forkan.common.utils import prune_dataset
-from forkan.models.bvae.networks import create_bvae_network
+from forkan.models.vae.networks import create_bvae_network
+
 
 class Sigma(Callback):
+    """
+    Callback to print current sigmas during training.
+    """
 
     def __init__(self, vae):
         super().__init__()
@@ -33,10 +37,51 @@ class Sigma(Callback):
         self.logger.debug('Current variance: {}'.format(np.exp(pred[1])[0]))
 
 
-class bVAE(object):
+class VAE(object):
 
-    def __init__(self, input_shape, latent_dim=10, beta=1., network='dsprites',
-                 debug=False, plot_models=False, print_summaries=False):
+    def __init__(self,
+                 input_shape,
+                 latent_dim=10,
+                 beta=1.,
+                 network='dsprites',
+                 name='vae',
+                 debug=False,
+                 plot_models=False,
+                 print_summaries=False):
+        """
+
+        Basic implementation af a Variational Auto Encoder using Keras.
+        A beta as weight for the KL in the loss term can also be given.
+
+
+        Parameters
+        ----------
+
+        input_shape : tuple
+            shape of desired input as tuple
+
+        latent_dim : int
+            number of nodes in bottleneck layer aka size of latent dimesion
+
+        network : str
+            string identifier for network architecture as defined in 'networks.py'
+
+        beta : float
+            weighting of the KL divergence in the loss
+
+        name : str
+            descriptive name of this model
+
+        debug : bool
+            whether to run a tf debug session
+
+        plot_models : bool
+            plot a model summary after model construction
+
+        print_summaries : str
+            print model summaries to stdout
+
+        """
 
         self.logger = logging.getLogger(__name__)
 
@@ -46,7 +91,7 @@ class bVAE(object):
         self.input_shape = input_shape
 
         # some metadata for weight file names
-        self.name = 'bvae'
+        self.name = name
         self.epochs = None
 
         # load network
@@ -89,6 +134,7 @@ class bVAE(object):
                                                                                 self.latent_dim))
 
     def _sample(self, inputs):
+        """ Sampling from the Gaussians produced by the encoder. """
 
         # unpack input
         z_mean, z_log_var = inputs
@@ -106,21 +152,26 @@ class bVAE(object):
         return z_mean + K.exp(0.5 * z_log_var) * epsilon
 
     def load(self, weight_path):
+        """ Load already trained weights. """
         self.logger.info('Using weights: {}'.format(weight_path.split('/')[-1]))
         self.vae.load_weights(weight_path)
 
     def save(self, dataset_name):
-        dest = '{}/{}_{}_b{}_L{}_E{}.h5'.format(weights_path, self.name,dataset_name,
+        """ Save current weights. """
+        dest = '{}/{}_{}_b{}_L{}_E{}.h5'.format(weights_path, self.name, dataset_name,
                                                 self.beta, self.latent_dim, self.epochs)
         self.vae.save_weights(dest, overwrite=True)
 
     def encode(self, data):
+        """ Encode input. Returns [z_mean, z_log_var, z]. """
         return self.encoder.predict(data)
 
     def decode(self, latents):
+        """ Reconstructs sample from latent space. """
         return self.decoder.predict(latents)
 
     def compile(self, optimizer='adam'):
+        """ Compile model with VAE loss. """
 
         # define recontruction loss
         re_loss = binary_crossentropy(K.flatten(self.inputs), K.flatten(self.outputs))
@@ -139,6 +190,10 @@ class bVAE(object):
         self.vae.compile(optimizer, metrics=['accuracy'])
 
     def fit(self, train, val=None, epochs=50, batch_size=128, log_sigma=False):
+        """
+        Trains VAE on given dataset. Validation set can be given, which
+        will be passed down the callbacks bound to training.
+        """
 
         # save epochs for weight file name
         self.epochs = epochs
@@ -178,6 +233,6 @@ if __name__ == '__main__':
     # get image size
     shape = (200, 160, 3)
 
-    vae = bVAE(shape, latent_dim=10, beta=32,
-               network_type='atari', print_summaries=True)
+    vae = VAE(shape, latent_dim=10, beta=32,
+              network_type='atari', print_summaries=True)
 

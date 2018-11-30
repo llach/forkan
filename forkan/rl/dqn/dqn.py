@@ -57,14 +57,104 @@ class DQN(object):
                  clean_previous_weights=False,
                  checkpoint_dir='/tmp/tf-checkpoints/dqn/',
                  ):
+        """
 
-        self.clean_previous_weights = clean_previous_weights
-        self.solved_callback = solved_callback
+        Parameters
+        ----------
+        env: gym.Environment
+            (gym) Environment the agent shall learn from and act on
+
+        name: str
+            descriptive name of this DQN configuration, e.g. 'atari-breakout'
+
+        network_type: str
+            which network is from 'networks.py'
+
+        total_timesteps: int or float
+            number of training timesteps
+
+        batch_size: int
+            size of minibatch per backprop
+
+        lr: float
+            learning rate
+
+        gamma: float
+            discount factor gamma for bellman target
+
+        buffer_size: int or float
+            maximum number of in replay buffer
+
+        final_eps: float
+            value to which epsilon is annealed
+
+        exploration_fraction: float
+            fraction of traing timesteps over which epsilon is annealed
+
+        training_start: int
+            timestep at which training of the q network begins
+
+        target_update_freq: int
+            frequency of target network updates (in timesteps)
+
+        optimizer: tf.Optimizer
+            optimizer class which shall be used such as Adam or RMSprop
+
+        gradient_clipping: int
+            if not None, gradients are clipped by this value by norm
+
+        reward_clipping: float
+            rewards will be clipped to this value if not None
+
+        rolling_reward_mean: int
+            window of which the rolling mean in the statistics is computed
+
+        solved_callback: function
+            function which gets as an input the episode rewards as an array and must return a bool.
+            if returned True, the training is considered as done and therefore prematurely interrupted.
+
+        render_training: bool
+            whether to render the environment while training
+
+        debug: bool
+            if true, a TensorBoard debugger session is started
+
+        use_tensorboard: bool
+            toggles TensorBoard support. If enabled, variable summaries are created and
+            written to disk in real time while training.
+
+        tensorboard_dir: str
+            Parent directory to save the TensorBoard files to. Within this directory, a new folder is
+            created for every training run of the policy. Folders are named as 'run-X' or 'run-latest',
+            where X stands for the runs ID.
+
+        tensorboard_suffix: str
+            Addition to the foldername for individual runs, could, for example, contain information about
+            hyperparamets used. Foldernames will be of the form 'run-SUFFIX-ID'.
+
+        clean_tensorboard_runs: bool
+            If true, data of other runs is wiped before execution. This exists mainly to avoid
+            disk bloating when testing a lot.
+
+        use_checkpoints: bool
+            Saves the model after each episode and upon every policy improvement. A csv-file
+            is also written to disk alongside the weights containing information about the run.
+
+        clean_previous_weights: bool
+            If true, weights of other runs is wiped before execution. This exists mainly to avoid
+            disk bloating when testing a lot.
+
+        checkpoint_dir: str
+            Parent directory for checkpoints. Within this directory, a folder named after the name of
+            this instance will created. Weights and the csv-file will be stored there.
+
+        """
+
+        # instance name
         self.name = name
-        self.use_checkpoints = use_checkpoints
 
+        # environment to act on / learn from
         self.env = env
-        self.logger = logging.getLogger(__name__)
 
         # basic DQN parameters
         self.total_timesteps = total_timesteps
@@ -82,12 +172,22 @@ class DQN(object):
         self.render_training = render_training
         self.reward_clipping = reward_clipping
 
-        # misc
-        self.debug = debug
-        self.tensorboard_dir = tensorboard_dir
+        # function to determine whether agent is able to act well enough
+        self.solved_callback = solved_callback
+
+        # rolling mean reward window
         self.rolling_reward_mean = rolling_reward_mean
+
+        # tensorboard and debug related variables
+        self.debug = debug
+        self.use_tensorboard = use_tensorboard
+        self.tensorboard_dir = tensorboard_dir
         self.clean_tensorboard_runs = clean_tensorboard_runs
         self.tensorboard_suffix = tensorboard_suffix
+
+        # checkpoint
+        self.use_checkpoints = use_checkpoints
+        self.clean_previous_weights = clean_previous_weights
 
         # calculate timestep where epsilon reaches its final value
         self.schedule_timesteps = int(total_timesteps * exploration_fraction)
@@ -95,8 +195,8 @@ class DQN(object):
         # concat name of instance to path -> distinction between saved instances
         self.checkpoint_dir = '{}/{}/'.format(checkpoint_dir, name)
 
-        # whether to use tensorboard or not
-        self.use_tensorboard = use_tensorboard
+        # logger for different levels
+        self.logger = logging.getLogger(__name__)
 
         # env specific parameter
         self.obs_shape = env.observation_space.shape
@@ -106,18 +206,21 @@ class DQN(object):
         self.Q_SCOPE = 'q_network'
         self.TARGET_SCOPE = 'target_network'
 
-        # init q network, target network, replay buffer
+        # build Q and target network; using different scopes to distinguish variables for gradient computation
         self.q_net, self.q_in = build_network(self.obs_shape, self.num_actions, network_type=network_type,
                                               name=self.Q_SCOPE)
         self.target_net, self.target_in = build_network(self.obs_shape, self.num_actions, network_type=network_type,
                                                         name=self.TARGET_SCOPE)
+
+        # create replay buffer
         self.replay_buffer = ReplayBuffer(int(buffer_size))
 
-        # save variables from q and target network for
+        # list of variables of the different networks. required for copying
+        # Q to target network and excluding target network variables from backprop
         self.q_net_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self.Q_SCOPE)
         self.target_net_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=self.TARGET_SCOPE)
 
-        # define additional variables used in loss function
+        # placeholders used in loss function
         self._L_r = tf.placeholder(tf.float32, (None,), name='loss_rewards')
         self._L_a = tf.placeholder(tf.int32, (None,), name='loss_actions')
         self._L_d = tf.placeholder(tf.float32, (None,), name='loss_dones')
@@ -125,11 +228,13 @@ class DQN(object):
         # epsilon schedule
         self.eps = LinearSchedule(self.schedule_timesteps, final_p=final_eps)
 
-        # init optimizer with loss to minimize
+        # init optimizer
         self.opt = self.optimizer(self.lr)
+
+        # specify loss function, only include Q network variables for gradient computation
         self.gradients = self.opt.compute_gradients(self._loss(), var_list=self.q_net_vars)
 
-        # clip gradients
+        # clip gradients by norm
         if self.gradient_clipping is not None:
             for idx, (grad, var) in enumerate(self.gradients):
                 if grad is not None:
@@ -139,16 +244,17 @@ class DQN(object):
         self.train_op = self.opt.apply_gradients(self.gradients)
 
         # update_target_fn will be called periodically to copy Q network to target Q network
-        self.update_target_expr = []
+        # variable lists are sorted by name to ensure that correct values are copied
+        self.update_target_ops = []
         for var, var_target in zip(sorted(self.q_net_vars, key=lambda v: v.name),
                                    sorted(self.target_net_vars, key=lambda v: v.name)):
-            self.update_target_expr.append(var_target.assign(var))
-        self.update_target_expr = tf.group(*self.update_target_expr)
+            self.update_target_ops.append(var_target.assign(var))
+        self.update_target_ops = tf.group(*self.update_target_ops)
 
         # global tf.Session and Graph init
         self.sess = tf.Session()
 
-        # launch debug session if requested
+        # launch debug session
         if self.debug:
             self.sess = tf_debug.TensorBoardDebugWrapperSession(self.sess, "localhost:6064")
 
@@ -156,11 +262,11 @@ class DQN(object):
         if self.use_tensorboard:
             self._setup_tensorboard()
 
-        # init variables etc.
+        # init variables
         self.sess.run(tf.global_variables_initializer())
 
         # sync networks before training
-        self.sess.run(self.update_target_expr)
+        self.sess.run(self.update_target_ops)
 
         # flag indicating whether this instance is completely trained
         self.is_trained = False
@@ -189,6 +295,12 @@ class DQN(object):
 
             # load already saved weights
             self._load()
+
+    def __del__(self):
+        """ Cleanup after object finalization """
+
+        # close tf.Session
+        self.sess.close()
 
     def _setup_tensorboard(self):
         """
@@ -238,12 +350,13 @@ class DQN(object):
 
         with tf.variable_scope('loss'):
 
-            # calculate target
+            # bellman target
             y = self._L_r + (self.gamma * (1.0 - self._L_d) * tf.reduce_max(self.target_net, axis=1))
 
             # select q value of taken action
             qj = tf.reduce_sum(self.q_net * tf.one_hot(self._L_a, self.num_actions), 1)
 
+            # apply huber loss
             loss = tf.losses.huber_loss(y, qj)
 
         if self.use_tensorboard:
@@ -303,6 +416,7 @@ class DQN(object):
         episode_rewards = []
 
         self.logger.info('Starting Exploration')
+
         for t in range(int(self.total_timesteps)):
 
             # decide on action either by policy or chose a random one
@@ -315,7 +429,7 @@ class DQN(object):
                 assert len(action) == 1, 'only one action can be taken!'
                 action = action[0]
 
-            # take action in environment
+            # act on environment with chosen action
             new_obs, reward, done, _ = self.env.step(action)
 
             # clip reward
@@ -325,7 +439,7 @@ class DQN(object):
             # store new transition
             self.replay_buffer.add(obs, action, reward, new_obs, float(done))
 
-            # t + 1 -> t
+            # new observation will be current one in next iteration
             obs = new_obs
 
             # append current rewards to episode reward series
@@ -346,17 +460,18 @@ class DQN(object):
                 # reset env to initial state
                 obs = self.env.reset()
 
+            # start training after warmup period
             if t >= self.training_start:
 
                 # calculate rolling reward
                 rr = np.mean(episode_rewards[-self.rolling_reward_mean:]) if len(episode_rewards) > 0 else 0.0
 
-                # small episode results table
+                # post episode stuff: printing and saving
                 if done:
                     result_table = [
                         ['t', t],
                         ['episode', len(episode_rewards)],
-                        ['mean_reward [20]', np.mean(episode_rewards[-self.rolling_reward_mean:])],
+                        ['mean_reward [20]', rr],
                         ['epsilon', epsilon]
                     ]
                     print('\n{}'.format(tabulate(result_table)))
@@ -372,9 +487,10 @@ class DQN(object):
                     # write current values to csv log
                     self.csvlog.write('{}, {}, {}\n'.format(len(episode_rewards), epsilon, episode_rewards[-1]))
 
+                # sample batch of transitions randomly for training
                 o, a, r, no, d = self.replay_buffer.sample(self.batch_size)
 
-                # collect summaries if needed or just train
+                # run training (and summary) operations
                 if self.use_tensorboard:
                     summary, _ = self.sess.run([self.merge_op, self.train_op],
                                                feed_dict={self.target_in: no, self.q_in: o, self._L_r: r, self._L_a: a,
@@ -387,14 +503,14 @@ class DQN(object):
 
                 # sync target network every C steps
                 if (t - self.training_start) % self.target_update_freq == 0:
-                    self.sess.run(self.update_target_expr)
+                    self.sess.run(self.update_target_ops)
 
             if self.solved_callback is not None:
                 if self.solved_callback(episode_rewards):
                     self.logger.info('Solved!')
                     break
 
-        # total reward of last (possibly interrupted) episode
+        # total reward of last episode
         episode_rewards.append(np.sum(episode_reward_series[-1]))
 
         # finalize training, e.g. set flags, write done-file
