@@ -31,3 +31,8 @@ If `dqn.py` is executed directly, a *DQN* training on the _CartPole-v0_ environm
 [Nature](https://www.nature.com/articles/nature14236.pdf)
 
 [Original](https://www.cs.toronto.edu/~vmnih/docs/dqn.pdf)
+
+### Enhnacements
+[Double Q](https://arxiv.org/pdf/1509.06461.pdf)
+
+[Dueling Networks](https://arxiv.org/abs/1511.06581)

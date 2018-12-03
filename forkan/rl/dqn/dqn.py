@@ -20,8 +20,6 @@ YETI
 enhacements:
 
 - soft update
-- dueling
-- double
 - prioritized replay
 
 """
@@ -32,7 +30,7 @@ class DQN(object):
     def __init__(self,
                  env,
                  name='default',
-                 network_type='mlp',
+                 network_type='mini-mlp',
                  total_timesteps=5e7,
                  batch_size=32,
                  lr=1e-3,
@@ -46,6 +44,7 @@ class DQN(object):
                  gradient_clipping=None,
                  reward_clipping=False,
                  double_q=True,
+                 dueling=True,
                  rolling_reward_mean=20,
                  solved_callback=None,
                  render_training=False,
@@ -59,7 +58,6 @@ class DQN(object):
                  checkpoint_dir='/tmp/tf-checkpoints/dqn/',
                  ):
         """
-
         Implementation of the Deep Q Learning (DQN) algorithm formualted by Mnih et. al.
         Contains some well known improvements over the vanilla DQN.
 
@@ -112,6 +110,10 @@ class DQN(object):
 
         double_q: bool
             enables Double Q Learning for DQN
+
+        dueling: bool
+            splits network architecture into advantage and value streams. V(s, a) gets
+            more frequent updates, should stabalize learning
 
         rolling_reward_mean: int
             window of which the rolling mean in the statistics is computed
@@ -180,6 +182,7 @@ class DQN(object):
 
         # enhancements to DQN published in papers
         self.double_q = double_q
+        self.dueling = dueling
 
         # function to determine whether agent is able to act well enough
         self.solved_callback = solved_callback
@@ -220,14 +223,14 @@ class DQN(object):
 
         # build Q and target network; using different scopes to distinguish variables for gradient computation
         self.q_t, self.q_t_in = build_network(self.obs_shape, self.num_actions, network_type=network_type,
-                                              scope=self.Q_SCOPE)
-        self.target_tp1, self.target_tp1_in = build_network(self.obs_shape, self.num_actions,
+                                              dueling=self.dueling, scope=self.Q_SCOPE, summaries=True)
+        self.target_tp1, self.target_tp1_in = build_network(self.obs_shape, self.num_actions, dueling=self.dueling,
                                                             network_type=network_type, scope=self.TARGET_SCOPE)
 
         # double Q learning needs to pass observations t+1 to the q networks for action selection
         # so we reuse already created q network variables but with different input
         if self.double_q:
-            self.q_tp1, self.q_tp1_in = build_network(self.obs_shape, self.num_actions,
+            self.q_tp1, self.q_tp1_in = build_network(self.obs_shape, self.num_actions, dueling=self.dueling,
                                                       network_type=network_type, scope=self.Q_SCOPE, reuse=True)
 
         # create replay buffer
