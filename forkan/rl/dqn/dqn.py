@@ -45,6 +45,7 @@ class DQN(object):
                  optimizer=tf.train.AdamOptimizer,
                  gradient_clipping=None,
                  reward_clipping=False,
+                 double_q=True,
                  rolling_reward_mean=20,
                  solved_callback=None,
                  render_training=False,
@@ -109,6 +110,9 @@ class DQN(object):
         reward_clipping: float
             rewards will be clipped to this value if not None
 
+        double_q: bool
+            enables Double Q Learning for DQN
+
         rolling_reward_mean: int
             window of which the rolling mean in the statistics is computed
 
@@ -170,13 +174,18 @@ class DQN(object):
         # tf.Optimizer
         self.optimizer = optimizer
 
-        # additional configuration options
+        # minor changes as suggested in some papers
         self.gradient_clipping = gradient_clipping
-        self.render_training = render_training
         self.reward_clipping = reward_clipping
+
+        # enhancements to DQN published in papers
+        self.double_q = double_q
 
         # function to determine whether agent is able to act well enough
         self.solved_callback = solved_callback
+
+        # call env.render() each training step
+        self.render_training = render_training
 
         # rolling mean reward window
         self.rolling_reward_mean = rolling_reward_mean
@@ -210,10 +219,16 @@ class DQN(object):
         self.TARGET_SCOPE = 'target_network'
 
         # build Q and target network; using different scopes to distinguish variables for gradient computation
-        self.q_net, self.q_in = build_network(self.obs_shape, self.num_actions, network_type=network_type,
-                                              name=self.Q_SCOPE)
-        self.target_net, self.target_in = build_network(self.obs_shape, self.num_actions, network_type=network_type,
-                                                        name=self.TARGET_SCOPE)
+        self.q_t, self.q_t_in = build_network(self.obs_shape, self.num_actions, network_type=network_type,
+                                              scope=self.Q_SCOPE)
+        self.target_tp1, self.target_tp1_in = build_network(self.obs_shape, self.num_actions,
+                                                            network_type=network_type, scope=self.TARGET_SCOPE)
+
+        # double Q learning needs to pass observations t+1 to the q networks for action selection
+        # so we reuse already created q network variables but with different input
+        if self.double_q:
+            self.q_tp1, self.q_tp1_in = build_network(self.obs_shape, self.num_actions,
+                                                      network_type=network_type, scope=self.Q_SCOPE, reuse=True)
 
         # create replay buffer
         self.replay_buffer = ReplayBuffer(int(buffer_size))
@@ -321,8 +336,8 @@ class DQN(object):
 
         # display q_values while training
         for a_i in range(self.num_actions):
-            scalar_summary('QTa_{}'.format(a_i + 1), tf.reduce_mean(self.target_net[:, a_i]), scope='Q-Values')
-            scalar_summary('Qa_{}'.format(a_i + 1), tf.reduce_mean(self.q_net[:, a_i]), scope='Q-Values')
+            scalar_summary('QTa_{}'.format(a_i + 1), tf.reduce_mean(self.target_tp1[:, a_i]), scope='Q-Values')
+            scalar_summary('Qa_{}'.format(a_i + 1), tf.reduce_mean(self.q_t[:, a_i]), scope='Q-Values')
 
         # plot network weights
         with tf.variable_scope('weights'):
@@ -353,11 +368,19 @@ class DQN(object):
 
         with tf.variable_scope('loss'):
 
+            # either use maximum target q or use value from target network while the action is chosen by the q net
+            if self.double_q:
+                act_tp1_idxs = tf.stop_gradient(tf.argmax(self.q_tp1, axis=1))
+                q_tp1 = tf.reduce_sum(self.target_tp1 * tf.one_hot(act_tp1_idxs, self.num_actions), axis=1)
+            else:
+
+                q_tp1 = tf.reduce_max(self.target_tp1, axis=1)
+
             # bellman target
-            y = self._L_r + (self.gamma * (1.0 - self._L_d) * tf.reduce_max(self.target_net, axis=1))
+            y = self._L_r + (self.gamma * (1.0 - self._L_d) * q_tp1)
 
             # select q value of taken action
-            qj = tf.reduce_sum(self.q_net * tf.one_hot(self._L_a, self.num_actions), 1)
+            qj = tf.reduce_sum(self.q_t * tf.one_hot(self._L_a, self.num_actions), axis=1)
 
             # apply huber loss
             loss = tf.losses.huber_loss(y, qj)
@@ -368,6 +391,29 @@ class DQN(object):
             tf.summary.histogram('selected_Q', qj)
 
         return tf.reduce_mean(loss)
+
+    def _build_feed_dict(self, obs_t, ac_t, rew_t, obs_tp1, dones, eps, rolling_rew):
+        """ Takes minibatch and returns feed dict for a tf.Session based on the algorithms configuration. """
+
+        # first, add data required in all DQN configs
+        feed_d = {
+            self.q_t_in: obs_t,
+            self.target_tp1_in: obs_tp1,
+            self._L_r: rew_t,
+            self._L_a: ac_t,
+            self._L_d: dones
+        }
+
+        # pass obs t+1 to q network
+        if self.double_q:
+            feed_d[self.q_tp1_in] = obs_tp1
+
+        # variables only necessary for TensorBoard visualisation
+        if self.use_tensorboard:
+            feed_d[self.eps_ph] = eps
+            feed_d[self.rew_ph] = rolling_rew
+
+        return feed_d
 
     def _save(self, weight_dir='latest'):
         """ Saves current weights under CHECKPOINT_DIR/weight_dir/ """
@@ -412,7 +458,7 @@ class DQN(object):
         """ Learns Q function for a given amount of timesteps """
 
         # reset env, store first observation
-        obs = self.env.reset()
+        obs_t = self.env.reset()
 
         # save all episode rewards
         episode_reward_series = [[0.0]]
@@ -428,22 +474,22 @@ class DQN(object):
             if _rand:
                 action = self.env.action_space.sample()
             else:
-                action = np.argmax(self.sess.run(self.q_net, {self.q_in: [obs]}), axis=1)
+                action = np.argmax(self.sess.run(self.q_t, {self.q_t_in: [obs_t]}), axis=1)
                 assert len(action) == 1, 'only one action can be taken!'
                 action = action[0]
 
             # act on environment with chosen action
-            new_obs, reward, done, _ = self.env.step(action)
+            obs_tp1, reward, done, _ = self.env.step(action)
 
             # clip reward
             if self.reward_clipping:
                 reward = 1 if reward > 0 else -1 if reward < 0 else 0
 
             # store new transition
-            self.replay_buffer.add(obs, action, reward, new_obs, float(done))
+            self.replay_buffer.add(obs_t, action, reward, obs_tp1, float(done))
 
             # new observation will be current one in next iteration
-            obs = new_obs
+            obs_t = obs_tp1
 
             # append current rewards to episode reward series
             episode_reward_series[-1].append(reward)
@@ -461,20 +507,20 @@ class DQN(object):
                 episode_reward_series.append([0.0])
 
                 # reset env to initial state
-                obs = self.env.reset()
+                obs_t = self.env.reset()
 
             # start training after warmup period
             if t >= self.training_start:
 
                 # calculate rolling reward
-                rr = np.mean(episode_rewards[-self.rolling_reward_mean:]) if len(episode_rewards) > 0 else 0.0
+                rolling_r = np.mean(episode_rewards[-self.rolling_reward_mean:]) if len(episode_rewards) > 0 else 0.0
 
                 # post episode stuff: printing and saving
                 if done:
                     result_table = [
                         ['t', t],
                         ['episode', len(episode_rewards)],
-                        ['mean_reward [20]', rr],
+                        ['mean_reward [20]', rolling_r],
                         ['epsilon', epsilon]
                     ]
                     print('\n{}'.format(tabulate(result_table)))
@@ -490,19 +536,16 @@ class DQN(object):
                     # write current values to csv log
                     self.csvlog.write('{}, {}, {}\n'.format(len(episode_rewards), epsilon, episode_rewards[-1]))
 
-                # sample batch of transitions randomly for training
-                o, a, r, no, d = self.replay_buffer.sample(self.batch_size)
+                # sample batch of transitions randomly for training and build feed dictionary
+                o_t, a_t, r_t, o_tp1, do = self.replay_buffer.sample(self.batch_size)
+                feed = self._build_feed_dict(o_t, a_t, r_t, o_tp1, do, epsilon, rolling_r)
 
                 # run training (and summary) operations
                 if self.use_tensorboard:
-                    summary, _ = self.sess.run([self.merge_op, self.train_op],
-                                               feed_dict={self.target_in: no, self.q_in: o, self._L_r: r, self._L_a: a,
-                                                          self._L_d: d, self.eps_ph: epsilon,
-                                                          self.rew_ph: rr})
+                    summary, _ = self.sess.run([self.merge_op, self.train_op], feed_dict=feed)
                     self.writer.add_summary(summary, t)
                 else:
-                    self.sess.run(self.train_op, feed_dict={self.target_in: no, self.q_in: o, self._L_r: r,
-                                                            self._L_a: a, self._L_d: d})
+                    self.sess.run(self.train_op, feed_dict=feed)
 
                 # sync target network every C steps
                 if (t - self.training_start) % self.target_update_freq == 0:
