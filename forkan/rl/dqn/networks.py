@@ -13,7 +13,7 @@ layer_norm: bool
 logger = logging.getLogger(__name__)
 
 
-def build_network(input_shape, num_actions, network_type='mlp', scope='', reuse=False):
+def build_network(input_shape, num_actions, network_type='mlp', scope='', reuse=None):
 
     # use variable scope given and reuse is necessary
     with tf.variable_scope(scope, reuse=reuse):
