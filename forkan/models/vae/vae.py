@@ -166,6 +166,10 @@ class VAE(object):
         """ Encode input. Returns [z_mean, z_log_var, z]. """
         return self.encoder.predict(data)
 
+    def process(self, data):
+        """ Encodes data and returns sampled z values. """
+        return self.encoder.predict(data)[-1]
+
     def decode(self, latents):
         """ Reconstructs sample from latent space. """
         return self.decoder.predict(latents)
