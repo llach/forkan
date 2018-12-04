@@ -10,6 +10,7 @@ class EnvWrapper(object):
                  env,
                  action_repetition=1,
                  observation_buffer_size=1,
+                 preprocessor=None,
                  ):
         """
         This class is used to wrap gym environments in order to add
@@ -29,11 +30,16 @@ class EnvWrapper(object):
 
         observation_buffer_size: int
             number of last observations that are returned by step()
+
+        preprocessor: Object
+            object with a process() method that processes raw
+            environment observations, e.g. a VAE
         """
 
         self.env = env
         self.action_repetition = action_repetition
         self.observation_buffer_size = observation_buffer_size
+        self.preprocessor = preprocessor
 
         # we must execute actions and return at least one observation
         assert self.action_repetition > 0
@@ -66,6 +72,8 @@ class EnvWrapper(object):
 
         for _ in range(self.action_repetition):
             obs, reward, done, info = self.env.step(action)
+            if self.preprocessor is not None:
+                obs = self.preprocessor.process(obs)
             self.obs_buffer.append(obs)
 
         obs_list = list(self.obs_buffer)
@@ -77,7 +85,10 @@ class EnvWrapper(object):
     def reset(self):
         """ Resets env and observation buffer """
         self._empty_observation_buffer()
-        self.obs_buffer.append(self.env.reset())
+        obs = self.env.reset()
+        if self.preprocessor is not None:
+            obs = self.preprocessor.process(obs)
+        self.obs_buffer.append(obs)
 
         obs_list = list(self.obs_buffer)
         if self.observation_buffer_size == 1:
