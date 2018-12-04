@@ -14,13 +14,6 @@ from forkan.common.tf_utils import scalar_summary
 from forkan.rl.dqn.networks import build_network
 
 
-"""
-YETI
-
-- soft update
-"""
-
-
 class DQN(object):
 
     def __init__(self,
@@ -39,6 +32,7 @@ class DQN(object):
                  optimizer=tf.train.AdamOptimizer,
                  gradient_clipping=None,
                  reward_clipping=False,
+                 tau=1.,
                  double_q=True,
                  dueling=True,
                  prioritized_replay=True,
@@ -108,6 +102,10 @@ class DQN(object):
 
         reward_clipping: float
             rewards will be clipped to this value if not None
+
+        tau: float
+            interpolation constant for soft update. 1.0 corresponds to
+            a full synchronisation of networks weights, as in the original DQN paper
 
         double_q: bool
             enables Double Q Learning for DQN
@@ -197,6 +195,7 @@ class DQN(object):
         self.reward_clipping = reward_clipping
 
         # enhancements to DQN published in papers
+        self.tau = tau
         self.double_q = double_q
         self.dueling = dueling
         self.prioritized_replay = prioritized_replay
@@ -230,6 +229,9 @@ class DQN(object):
 
         # concat name of instance to path -> distinction between saved instances
         self.checkpoint_dir = '{}/{}/'.format(checkpoint_dir, name)
+
+        # sanity checks
+        assert 0.0 < self.tau <= 1.0
 
         # logger for different levels
         self.logger = logging.getLogger(__name__)
@@ -302,9 +304,10 @@ class DQN(object):
         # update_target_fn will be called periodically to copy Q network to target Q network
         # variable lists are sorted by name to ensure that correct values are copied
         self.update_target_ops = []
-        for var, var_target in zip(sorted(self.q_net_vars, key=lambda v: v.name),
+        for var_q, var_target in zip(sorted(self.q_net_vars, key=lambda v: v.name),
                                    sorted(self.target_net_vars, key=lambda v: v.name)):
-            self.update_target_ops.append(var_target.assign(var))
+            v_update = var_target.assign(self.tau * var_q + (1 - self.tau) * var_target)
+            self.update_target_ops.append(v_update)
         self.update_target_ops = tf.group(*self.update_target_ops)
 
         # global tf.Session and Graph init
@@ -609,7 +612,6 @@ class DQN(object):
                 if self.prioritized_replay:
                     new_prios = np.abs(td_errors) + self.prioritized_replay_eps
                     self.replay_buffer.update_priorities(batch_idxs, new_prios)
-
 
                 # sync target network every C steps
                 if (t - self.training_start) % self.target_update_freq == 0:
