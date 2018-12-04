@@ -7,7 +7,7 @@ from tensorflow.python import debug as tf_debug
 from tabulate import tabulate
 
 from baselines.common.schedules import LinearSchedule
-from baselines.deepq.replay_buffer import ReplayBuffer
+from baselines.deepq.replay_buffer import ReplayBuffer, PrioritizedReplayBuffer
 
 from forkan.common.utils import rename_latest_run, clean_dir, create_dir
 from forkan.common.tf_utils import scalar_summary
@@ -17,11 +17,7 @@ from forkan.rl.dqn.networks import build_network
 """
 YETI
 
-enhacements:
-
 - soft update
-- prioritized replay
-
 """
 
 
@@ -45,6 +41,11 @@ class DQN(object):
                  reward_clipping=False,
                  double_q=True,
                  dueling=True,
+                 prioritized_replay=True,
+                 prioritized_replay_alpha=0.6,
+                 prioritized_replay_beta_init=0.4,
+                 prioritized_replay_beta_fraction=1.0,
+                 prioritized_replay_eps=1e-6,
                  rolling_reward_mean=20,
                  solved_callback=None,
                  render_training=False,
@@ -115,6 +116,21 @@ class DQN(object):
             splits network architecture into advantage and value streams. V(s, a) gets
             more frequent updates, should stabalize learning
 
+        prioritized_replay: True
+            use (proportional) prioritized replay
+
+        prioritized_replay_alpha: float
+            alpha for weighting priorization
+
+        prioritized_replay_beta_init: float
+            initial value of beta for prioritized replay buffer
+
+        prioritized_replay_beta_fraction: float
+            fraction of total timesteps to anneal beta to 1.0
+
+        prioritized_replay_eps: float
+            epsilon to add to the TD errors when updating priorities.
+
         rolling_reward_mean: int
             window of which the rolling mean in the statistics is computed
 
@@ -183,6 +199,11 @@ class DQN(object):
         # enhancements to DQN published in papers
         self.double_q = double_q
         self.dueling = dueling
+        self.prioritized_replay = prioritized_replay
+        self.prioritized_replay_alpha = prioritized_replay_alpha
+        self.prioritized_replay_beta_init = prioritized_replay_beta_init
+        self.prioritized_replay_beta_fraction = prioritized_replay_beta_fraction
+        self.prioritized_replay_eps = prioritized_replay_eps
 
         # function to determine whether agent is able to act well enough
         self.solved_callback = solved_callback
@@ -234,7 +255,10 @@ class DQN(object):
                                                       network_type=network_type, scope=self.Q_SCOPE, reuse=True)
 
         # create replay buffer
-        self.replay_buffer = ReplayBuffer(int(buffer_size))
+        if self.prioritized_replay:
+            self.replay_buffer = PrioritizedReplayBuffer(int(buffer_size), self.prioritized_replay_alpha)
+        else:
+            self.replay_buffer = ReplayBuffer(int(buffer_size))
 
         # list of variables of the different networks. required for copying
         # Q to target network and excluding target network variables from backprop
@@ -245,6 +269,17 @@ class DQN(object):
         self._L_r = tf.placeholder(tf.float32, (None,), name='loss_rewards')
         self._L_a = tf.placeholder(tf.int32, (None,), name='loss_actions')
         self._L_d = tf.placeholder(tf.float32, (None,), name='loss_dones')
+
+        # pointer to td error vector
+        self._td_errors = tf.placeholder(tf.float32, (None,), name='td_errors')
+
+        # configure prioritized replay
+        if self.prioritized_replay:
+            self._is_weights = tf.placeholder(tf.float32, (None,), name='importance_sampling_weights')
+
+            # schedule for PR beta
+            beta_steps = self.total_timesteps * self.prioritized_replay_beta_fraction
+            self.pr_beta = LinearSchedule(int(beta_steps), initial_p=prioritized_replay_beta_init, final_p=1.0)
 
         # epsilon schedule
         self.eps = LinearSchedule(self.schedule_timesteps, final_p=final_eps)
@@ -385,6 +420,9 @@ class DQN(object):
             # select q value of taken action
             qj = tf.reduce_sum(self.q_t * tf.one_hot(self._L_a, self.num_actions), axis=1)
 
+            # TD errors
+            self._td_errors = qj - y
+
             # apply huber loss
             loss = tf.losses.huber_loss(y, qj)
 
@@ -393,9 +431,15 @@ class DQN(object):
             scalar_summary('huber-loss', tf.reduce_mean(loss))
             tf.summary.histogram('selected_Q', qj)
 
-        return tf.reduce_mean(loss)
+        #  importance sampling weights
+        if self.prioritized_replay:
+            updates = tf.reduce_mean(self._is_weights * loss)
+        else:
+            updates = tf.reduce_mean(loss)
 
-    def _build_feed_dict(self, obs_t, ac_t, rew_t, obs_tp1, dones, eps, rolling_rew):
+        return updates
+
+    def _build_feed_dict(self, obs_t, ac_t, rew_t, obs_tp1, dones, eps, rolling_rew, weights=None):
         """ Takes minibatch and returns feed dict for a tf.Session based on the algorithms configuration. """
 
         # first, add data required in all DQN configs
@@ -410,6 +454,10 @@ class DQN(object):
         # pass obs t+1 to q network
         if self.double_q:
             feed_d[self.q_tp1_in] = obs_tp1
+
+        # importance sampling weights
+        if self.prioritized_replay:
+            feed_d[self._is_weights] = weights
 
         # variables only necessary for TensorBoard visualisation
         if self.use_tensorboard:
@@ -540,15 +588,28 @@ class DQN(object):
                     self.csvlog.write('{}, {}, {}\n'.format(len(episode_rewards), epsilon, episode_rewards[-1]))
 
                 # sample batch of transitions randomly for training and build feed dictionary
-                o_t, a_t, r_t, o_tp1, do = self.replay_buffer.sample(self.batch_size)
-                feed = self._build_feed_dict(o_t, a_t, r_t, o_tp1, do, epsilon, rolling_r)
+                # prioritized replay needs a beta and returns weights.
+                if self.prioritized_replay:
+                    o_t, a_t, r_t, o_tp1, do, is_ws, batch_idxs = self.replay_buffer.sample(self.batch_size,
+                                                                                            self.pr_beta.value(t))
+                    feed = self._build_feed_dict(o_t, a_t, r_t, o_tp1, do, epsilon, rolling_r, weights=is_ws)
+                else:
+                    o_t, a_t, r_t, o_tp1, do = self.replay_buffer.sample(self.batch_size)
+                    feed = self._build_feed_dict(o_t, a_t, r_t, o_tp1, do, epsilon, rolling_r)
 
                 # run training (and summary) operations
                 if self.use_tensorboard:
-                    summary, _ = self.sess.run([self.merge_op, self.train_op], feed_dict=feed)
+                    summary, _, td_errors = self.sess.run([self.merge_op, self.train_op, self._td_errors],
+                                                          feed_dict=feed)
                     self.writer.add_summary(summary, t)
                 else:
                     self.sess.run(self.train_op, feed_dict=feed)
+
+                # new td errors needed to update buffer weights
+                if self.prioritized_replay:
+                    new_prios = np.abs(td_errors) + self.prioritized_replay_eps
+                    self.replay_buffer.update_priorities(batch_idxs, new_prios)
+
 
                 # sync target network every C steps
                 if (t - self.training_start) % self.target_update_freq == 0:
