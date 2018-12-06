@@ -208,7 +208,7 @@ class ConfigManager(object):
 
         conf = self.get_config_by_name(name)
 
-        if 'model' not in conf:
+        if 'model' in conf:
 
             # get model and dataset name
             dataset_type = conf['dataset'].pop('type')
