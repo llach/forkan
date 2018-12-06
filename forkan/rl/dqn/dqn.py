@@ -53,7 +53,7 @@ class DQN(object):
                  clean_previous_weights=False,
                  ):
         """
-        Implementation of the Deep Q Learning (DQN) algorithm formualted by Mnih et. al.
+        Implementation of the Deep Q Learning (DQN) algorithm formulated by Mnih et. al.
         Contains some well known improvements over the vanilla DQN.
 
         Parameters
@@ -178,6 +178,7 @@ class DQN(object):
         # basic DQN parameters
         self.total_timesteps = total_timesteps
         self.batch_size = batch_size
+        self.final_eps = final_eps
         self.lr = lr
         self.gamma = gamma
         self.training_start = training_start
@@ -624,9 +625,39 @@ class DQN(object):
         # finalize training, e.g. set flags, write done-file
         self._finalize_training()
 
-    def run(self):
+    def run(self, render=True):
         """ Runs policy on given environment """
-        pass
+
+        if not self.is_trained:
+            self.logger.warning('Trying to run untrained model!')
+
+        # set necessary parameters to their defaults
+        epsilon = self.final_eps
+        reward = 0.0
+        obs = self.env.reset()
+
+        while True:
+
+            # decide on action either by policy or chose a random one
+            _rand = np.random.choice([True, False], p=[epsilon, 1 - epsilon])
+            if _rand:
+                action = self.env.action_space.sample()
+            else:
+                action = np.argmax(self.sess.run(self.q_t, {self.q_t_in: [obs]}), axis=1)
+                assert len(action) == 1, 'only one action can be taken!'
+                action = action[0]
+
+            # act on environment with chosen action
+            obs, rew, done, _ = self.env.step(action)
+            reward += rew
+
+            if render:
+                self.env.render()
+
+            if done:
+                self.logger.info('Done! Reward {}'.format(reward))
+                reward = 0.0
+                obs = self.env.reset()
 
 
 if __name__ == '__main__':
