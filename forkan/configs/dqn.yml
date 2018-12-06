@@ -1,0 +1,38 @@
+name: cart-dqn
+algorithm:
+  type: dqn
+  name: cart-dqn
+  buffer_size: 50000
+  total_timesteps: 100000
+  training_start: 1000
+  target_update_freq: 500
+  exploration_fraction: 0.1
+  prioritized_replay: True
+  double_q: True
+  dueling: True
+  lr: 5e-4
+  gamma: 1.
+  batch_size: 128
+  clean_tensorboard_runs: True
+  clean_previous_weights: True
+environment:
+  type: CartPole-v0
+---
+name: breakout-dqn
+algorithm:
+  type: dqn
+  name: breakout-dqn
+  buffer_size: 50000
+  total_timesteps: 100000
+  training_start: 1000
+  target_update_freq: 500
+  exploration_fraction: 0.1
+  lr: 5e-4
+  gamma: 1.
+  batch_size: 32
+  clean_tensorboard_runs: True
+  clean_previous_weights: True
+environment:
+  type: Breakout-v0
+
+

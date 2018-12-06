@@ -9,6 +9,7 @@ from tabulate import tabulate
 from baselines.common.schedules import LinearSchedule
 from baselines.deepq.replay_buffer import ReplayBuffer, PrioritizedReplayBuffer
 
+from forkan import weights_path
 from forkan.common.utils import rename_latest_run, clean_dir, create_dir
 from forkan.common.tf_utils import scalar_summary
 from forkan.rl.dqn.networks import build_network
@@ -50,7 +51,6 @@ class DQN(object):
                  clean_tensorboard_runs=False,
                  use_checkpoints=True,
                  clean_previous_weights=False,
-                 checkpoint_dir='/tmp/tf-checkpoints/dqn/',
                  ):
         """
         Implementation of the Deep Q Learning (DQN) algorithm formualted by Mnih et. al.
@@ -167,10 +167,6 @@ class DQN(object):
             If true, weights of other runs is wiped before execution. This exists mainly to avoid
             disk bloating when testing a lot.
 
-        checkpoint_dir: str
-            Parent directory for checkpoints. Within this directory, a folder named after the name of
-            this instance will created. Weights and the csv-file will be stored there.
-
         """
 
         # instance name
@@ -228,7 +224,7 @@ class DQN(object):
         self.schedule_timesteps = int(total_timesteps * exploration_fraction)
 
         # concat name of instance to path -> distinction between saved instances
-        self.checkpoint_dir = '{}/{}/'.format(checkpoint_dir, name)
+        self.checkpoint_dir = '{}/dqn/{}/'.format(weights_path, name)
 
         # sanity checks
         assert 0.0 < self.tau <= 1.0
@@ -335,8 +331,8 @@ class DQN(object):
         # i.e. load the saved weights into target and online network.
         if self.use_checkpoints:
 
-            # remove old weights if needed
-            if self.clean_previous_weights:
+            # remove old weights if needed and not already trained until the end
+            if self.clean_previous_weights and not os.path.isfile('{}/done'.format(self.checkpoint_dir)):
                 clean_dir(self.checkpoint_dir)
 
             # be sure that the directory exits
@@ -636,6 +632,6 @@ class DQN(object):
 if __name__ == '__main__':
     from forkan import ConfigManager
 
-    cm = ConfigManager(['dqn-cart'])
+    cm = ConfigManager(['cart-dqn'])
     cm.exec()
 

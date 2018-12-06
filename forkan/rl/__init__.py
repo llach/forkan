@@ -18,8 +18,11 @@ def make(name, **kwargs):
     return EnvWrapper(e, **kwargs)
 
 
-def load_algorithm(alg_type, env_type, alg_kwargs={}, env_kwargs={}):
+def load_algorithm(alg_type, env_type, alg_kwargs={}, env_kwargs={}, preprocessor=None):
     logger.debug('Loading RL algorithm {} with environment {} ... '.format(alg_type, env_type))
+
+    if preprocessor is not None:
+        env_kwargs['preprocessor'] = preprocessor
 
     env = make(env_type, **env_kwargs)
 
