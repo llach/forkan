@@ -13,6 +13,8 @@ algorithm:
   lr: 5e-4
   gamma: 1.
   batch_size: 128
+  gradient_clipping: 10
+  reward_clipping: 1
   clean_tensorboard_runs: True
   clean_previous_weights: True
 environment:
@@ -22,17 +24,43 @@ name: breakout-dqn
 algorithm:
   type: dqn
   name: breakout-dqn
-  buffer_size: 50000
-  total_timesteps: 100000
-  training_start: 1000
-  target_update_freq: 500
+  network_type: conv-atari
+  buffer_size: 1e6
+  total_timesteps: 5e7
+  training_start: 5e4
+  target_update_freq: 1e4
   exploration_fraction: 0.1
-  lr: 5e-4
-  gamma: 1.
+  gamma: .99
   batch_size: 32
+  prioritized_replay: True
+  double_q: True
+  dueling: True
   clean_tensorboard_runs: True
   clean_previous_weights: True
 environment:
   type: Breakout-v0
-
+  action_repetition: 4
+  observation_buffer_size: 4
+---
+name: breakout-vae-dqn
+algorithm:
+  type: dqn
+  name: breakout-dqn
+  buffer_size: 1e5
+  total_timesteps: 5e6
+  training_start: 5e4
+  target_update_freq: 1e4
+  exploration_fraction: 0.1
+  gamma: .99
+  batch_size: 128
+  prioritized_replay: True
+  double_q: True
+  dueling: True
+  clean_tensorboard_runs: True
+  clean_previous_weights: True
+environment:
+  type: Breakout-v0
+  action_repetition: 4
+  observation_buffer_size: 4
+  target_shape: [200, 160, 3]
 
