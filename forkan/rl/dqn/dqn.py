@@ -176,30 +176,32 @@ class DQN(object):
         self.env = env
 
         # basic DQN parameters
-        self.total_timesteps = total_timesteps
+        self.total_timesteps = float(total_timesteps)
+        self.buffer_size = int(float(buffer_size))
         self.batch_size = batch_size
         self.final_eps = final_eps
-        self.lr = lr
-        self.gamma = gamma
-        self.training_start = training_start
-        self.target_update_freq = target_update_freq
+        self.lr = float(lr)
+        self.gamma = float(gamma)
+        self.exploration_fraction = float(exploration_fraction)
+        self.training_start = int(float(training_start))
+        self.target_update_freq = int(float(target_update_freq))
 
         # tf.Optimizer
         self.optimizer = optimizer
 
         # minor changes as suggested in some papers
-        self.gradient_clipping = gradient_clipping
-        self.reward_clipping = reward_clipping
+        self.gradient_clipping = int(gradient_clipping) if gradient_clipping is not None else None
+        self.reward_clipping = int(reward_clipping) if reward_clipping is not None else None
 
         # enhancements to DQN published in papers
-        self.tau = tau
+        self.tau = float(tau)
         self.double_q = double_q
         self.dueling = dueling
         self.prioritized_replay = prioritized_replay
-        self.prioritized_replay_alpha = prioritized_replay_alpha
-        self.prioritized_replay_beta_init = prioritized_replay_beta_init
-        self.prioritized_replay_beta_fraction = prioritized_replay_beta_fraction
-        self.prioritized_replay_eps = prioritized_replay_eps
+        self.prioritized_replay_alpha = float(prioritized_replay_alpha)
+        self.prioritized_replay_beta_init = float(prioritized_replay_beta_init)
+        self.prioritized_replay_beta_fraction = float(prioritized_replay_beta_fraction)
+        self.prioritized_replay_eps = float(prioritized_replay_eps)
 
         # function to determine whether agent is able to act well enough
         self.solved_callback = solved_callback
@@ -222,7 +224,7 @@ class DQN(object):
         self.clean_previous_weights = clean_previous_weights
 
         # calculate timestep where epsilon reaches its final value
-        self.schedule_timesteps = int(total_timesteps * exploration_fraction)
+        self.schedule_timesteps = int(self.total_timesteps * self.exploration_fraction)
 
         # concat name of instance to path -> distinction between saved instances
         self.checkpoint_dir = '{}/dqn/{}/'.format(weights_path, name)
@@ -255,9 +257,9 @@ class DQN(object):
 
         # create replay buffer
         if self.prioritized_replay:
-            self.replay_buffer = PrioritizedReplayBuffer(int(buffer_size), self.prioritized_replay_alpha)
+            self.replay_buffer = PrioritizedReplayBuffer(self.buffer_size, self.prioritized_replay_alpha)
         else:
-            self.replay_buffer = ReplayBuffer(int(buffer_size))
+            self.replay_buffer = ReplayBuffer(self.buffer_size)
 
         # list of variables of the different networks. required for copying
         # Q to target network and excluding target network variables from backprop
@@ -277,14 +279,14 @@ class DQN(object):
             self._is_weights = tf.placeholder(tf.float32, (None,), name='importance_sampling_weights')
 
             # schedule for PR beta
-            beta_steps = self.total_timesteps * self.prioritized_replay_beta_fraction
-            self.pr_beta = LinearSchedule(int(beta_steps), initial_p=prioritized_replay_beta_init, final_p=1.0)
+            beta_steps = int(self.total_timesteps * self.prioritized_replay_beta_fraction)
+            self.pr_beta = LinearSchedule(beta_steps, initial_p=prioritized_replay_beta_init, final_p=1.0)
 
         # epsilon schedule
         self.eps = LinearSchedule(self.schedule_timesteps, final_p=final_eps)
 
         # init optimizer
-        self.opt = self.optimizer(float(self.lr))
+        self.opt = self.optimizer(self.lr)
 
         # specify loss function, only include Q network variables for gradient computation
         self.gradients = self.opt.compute_gradients(self._loss(), var_list=self.q_net_vars)

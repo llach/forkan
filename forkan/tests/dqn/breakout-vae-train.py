@@ -2,7 +2,7 @@ from forkan import ConfigManager
 from forkan.rl import load_algorithm
 
 MOC= 'breakout-vae-medium'
-RLC = 'breakout-dqn'
+RLC = 'breakout-vae-dqn'
 
 cm = ConfigManager([RLC, MOC])
 
