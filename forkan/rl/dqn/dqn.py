@@ -37,7 +37,7 @@ class DQN(object):
                  double_q=False,
                  dueling=False,
                  prioritized_replay=False,
-                 prioritized_replay_alpha=0.6,
+                 prioritized_replay_alpha=0.5,
                  prioritized_replay_beta_init=0.4,
                  prioritized_replay_beta_fraction=1.0,
                  prioritized_replay_eps=1e-6,
