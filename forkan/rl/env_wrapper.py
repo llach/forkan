@@ -4,6 +4,7 @@ from collections import deque
 from gym.core import Space
 from PIL import Image
 
+
 class EnvWrapper(object):
 
     def __init__(self, 
@@ -12,6 +13,7 @@ class EnvWrapper(object):
                  observation_buffer_size=1,
                  preprocessor=None,
                  target_shape=None,
+                 flatten_observations=True,
                  ):
         """
         This class is used to wrap gym environments in order to add
@@ -38,12 +40,17 @@ class EnvWrapper(object):
 
         target_shape: tuple
             input shape for preprocessor
+
+        flatten_observations: bool
+            if True, will call obs.flatten(), otherwise observation buffer is
+            returned with batch-style shape: (BUFFER_SIZE, OBS_SHAPE)
         """
 
         self.env = env
         self.action_repetition = action_repetition
         self.target_shape = target_shape
         self.observation_buffer_size = observation_buffer_size
+        self.flatten_observations = flatten_observations
         self.preprocessor = preprocessor
 
         # we must execute actions and return at least one observation
@@ -59,16 +66,22 @@ class EnvWrapper(object):
 
         # if output is transformed by a preprocessor, adjust the observation space shape
         if self.preprocessor is not None:
-            self.oshape = (self.preprocessor.latent_dim, )
+            self.oshape = (1, self.preprocessor.latent_dim)
         else:
             self.oshape = self.env.observation_space.shape
 
-        # if observation_buffer_size == 1, we leave out the dimension of size 1.
+        # store for empty buffer init
+        self.single_observation_shape = self.oshape
+
+        # if observation_buffer_size == 1, we leave out the first (batch) dimension of size 1.
         # otherwise we'd break compatibility with MLPs
-        if observation_buffer_size == 1:
-            self.observation_space = Space(self.oshape, np.int8)
+        if self.flatten_observations:
+            self.observation_space = Space((self.observation_buffer_size * np.product(self.oshape),), np.int8)
         else:
-            self.observation_space = Space(((self.observation_buffer_size,) + self.oshape), np.int8)
+            self.observation_space = Space((self.observation_buffer_size,) + self.oshape, np.int8)
+
+        # quick pointer to observation space shape
+        self.oshape = self.observation_space.shape
 
         # at the beginning, we want only zeros in buffer
         self._empty_observation_buffer()
@@ -76,7 +89,7 @@ class EnvWrapper(object):
     def _empty_observation_buffer(self):
         """ Fills buffer with observation space sized zero-arrays """
         for _ in range(self.observation_buffer_size):
-            self.obs_buffer.append(np.zeros(self.oshape))
+            self.obs_buffer.append(np.zeros(self.single_observation_shape))
 
     def _transform_obs(self, obs):
         """ Processes observations based on Wrapper config """
@@ -86,7 +99,6 @@ class EnvWrapper(object):
             if self.target_shape is not None:
                 obs = np.array(Image.fromarray(obs).resize((self.target_shape[1], self.target_shape[0])), dtype=np.float32)
             obs = self.preprocessor.process(np.expand_dims(obs, axis=0))
-
         return obs
 
     def step(self, action):
@@ -98,9 +110,11 @@ class EnvWrapper(object):
 
             self.obs_buffer.append(obs)
 
-        obs_list = list(self.obs_buffer)
-        if self.observation_buffer_size == 1:
-            obs_list = np.reshape(obs_list, self.oshape)
+        # convert to ndarray without dimensions of size 1
+        obs_list = np.squeeze(np.array(self.obs_buffer))
+
+        if self.flatten_observations:
+            obs_list = obs_list.flatten()
 
         return obs_list, reward, done, info
 
@@ -116,8 +130,10 @@ class EnvWrapper(object):
 
         self.obs_buffer.append(obs)
 
-        obs_list = list(self.obs_buffer)
-        if self.observation_buffer_size == 1:
-            obs_list = np.reshape(obs_list, self.oshape)
+        # convert to ndarray without dimensions of size 1
+        obs_list = np.squeeze(np.array(self.obs_buffer))
+
+        if self.flatten_observations:
+            obs_list = obs_list.flatten()
 
         return obs_list

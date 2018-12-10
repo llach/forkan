@@ -41,6 +41,7 @@ environment:
   type: Breakout-v0
   action_repetition: 4
   observation_buffer_size: 4
+  flatten_observations: False
 ---
 name: breakout-vae-dqn
 algorithm:
@@ -63,4 +64,3 @@ environment:
   action_repetition: 4
   observation_buffer_size: 4
   target_shape: [200, 160, 3]
-
