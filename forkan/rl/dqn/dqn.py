@@ -358,10 +358,11 @@ class DQN(object):
         """ Cleanup after object finalization """
 
         # close tf.Session
-        self.sess.close()
+        if hasattr(self, 'sess'):
+           self.sess.close()
 
         # close filehandle
-        if self.use_checkpoints:
+        if hasattr(self, 'csvlog'):
             self.csvlog.close()
 
     def _setup_tensorboard(self):
