@@ -12,12 +12,12 @@ Decoder of AE like model is run where all z_i but one are kept fixed. The variab
 values from a certain range and output images are generated.
 """
 
-MODEL_NAME = 'breakout'
+MODEL_NAME = 'breakout-vae-medium'
 
 cm = ConfigManager()
 model = cm.restore_model(MODEL_NAME, with_dataset=False)
 
-idx = 13
+idx = 28
 
 saving = True
 save_path = os.environ['HOME'] + '/.keras/forkan/figures/{}/z_{}/'.format(MODEL_NAME, idx)

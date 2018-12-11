@@ -20,9 +20,10 @@ dataset2plot_shape = {
     'vae-duo': [1, 10],
     'vae-duo-short': [1, 10],
     'breakout': [2, 15],
+    'breakout-vae-medium': [2, 15],
 }
 
-MODEL_NAME = 'vae-trans'
+MODEL_NAME = 'breakout-vae-medium'
 
 # threshold for coloring bars red
 COL_THRESH = 0.8
