@@ -360,6 +360,10 @@ class DQN(object):
         # close tf.Session
         self.sess.close()
 
+        # close filehandle
+        if self.use_checkpoints:
+            self.csvlog.close()
+
     def _setup_tensorboard(self):
         """
         Adds all variables that might help debugging to Tensorboard.
