@@ -2,7 +2,6 @@ import numpy as np
 
 from collections import deque
 from gym.core import Space
-from PIL import Image
 
 
 class EnvWrapper(object):
@@ -12,8 +11,8 @@ class EnvWrapper(object):
                  action_repetition=1,
                  observation_buffer_size=1,
                  preprocessor=None,
-                 target_shape=None,
-                 flatten_observations=True,
+                 flatten_observations=False,
+                 buffer_last=True,
                  ):
         """
         This class is used to wrap gym environments in order to add
@@ -38,19 +37,19 @@ class EnvWrapper(object):
             object with a process() method that processes raw
             environment observations, e.g. a VAE
 
-        target_shape: tuple
-            input shape for preprocessor
-
         flatten_observations: bool
             if True, will call obs.flatten(), otherwise observation buffer is
             returned with batch-style shape: (BUFFER_SIZE, OBS_SHAPE)
+
+        buffer_last: bool
+            if True, obs will have shape (OBS_SHAPE, BUFFER_SIZE), and (BUFFER_SIZE, OBS_SHAPE) otherwise
         """
 
         self.env = env
         self.action_repetition = action_repetition
-        self.target_shape = target_shape
         self.observation_buffer_size = observation_buffer_size
         self.flatten_observations = flatten_observations
+        self.buffer_last = buffer_last
         self.preprocessor = preprocessor
 
         # we must execute actions and return at least one observation
@@ -78,7 +77,10 @@ class EnvWrapper(object):
         if self.flatten_observations:
             self.observation_space = Space((self.observation_buffer_size * np.product(self.oshape),), np.int8)
         else:
-            self.observation_space = Space((self.observation_buffer_size,) + self.oshape, np.int8)
+            if self.buffer_last:
+                self.observation_space = Space(self.oshape + (self.observation_buffer_size,), np.int8)
+            else:
+                self.observation_space = Space((self.observation_buffer_size,) + self.oshape, np.int8)
 
         # quick pointer to observation space shape
         self.oshape = self.observation_space.shape
@@ -96,13 +98,27 @@ class EnvWrapper(object):
 
         # pass to preprocessor
         if self.preprocessor is not None:
-            if self.target_shape is not None:
-                obs = np.array(Image.fromarray(obs).resize((self.target_shape[1], self.target_shape[0])), dtype=np.float32)
             obs = self.preprocessor.process(np.expand_dims(obs, axis=0))
         return obs
 
+    def _transform_buffer(self):
+        """ Applies configures transformations to observation buffer """
+
+        ol = np.array(self.obs_buffer)
+
+        if self.buffer_last:
+            ol = np.rollaxis(ol, 0, 3)
+
+        # convert to ndarray without dimensions of size 1
+        ol = np.squeeze(ol)
+
+        if self.flatten_observations:
+            ol = ol.flatten()
+
+        return ol
+
     def step(self, action):
-        """ Executes action M times on env """
+        """ Executes action on env, repeated M times """
 
         for _ in range(self.action_repetition):
             obs, reward, done, info = self.env.step(action)
@@ -110,13 +126,7 @@ class EnvWrapper(object):
 
             self.obs_buffer.append(obs)
 
-        # convert to ndarray without dimensions of size 1
-        obs_list = np.squeeze(np.array(self.obs_buffer))
-
-        if self.flatten_observations:
-            obs_list = obs_list.flatten()
-
-        return obs_list, reward, done, info
+        return self._transform_buffer(), reward, done, info
 
     def render(self):
         """ Renders environment """
@@ -130,10 +140,4 @@ class EnvWrapper(object):
 
         self.obs_buffer.append(obs)
 
-        # convert to ndarray without dimensions of size 1
-        obs_list = np.squeeze(np.array(self.obs_buffer))
-
-        if self.flatten_observations:
-            obs_list = obs_list.flatten()
-
-        return obs_list
+        return self._transform_buffer()
