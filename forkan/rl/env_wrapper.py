@@ -107,9 +107,9 @@ class EnvWrapper(object):
         ol = np.array(self.obs_buffer)
 
         if self.buffer_last:
-            ol = np.rollaxis(ol, 0, 3)
+            ol = np.moveaxis(ol, 0, len(ol.shape)-1)
 
-        # convert to ndarray without dimensions of size 1
+        # sqeeze away dimension of size 1
         ol = np.squeeze(ol)
 
         if self.flatten_observations:
