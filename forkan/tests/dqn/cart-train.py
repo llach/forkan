@@ -1,5 +1,7 @@
-from forkan import ConfigManager
-from forkan.rl import load_algorithm
+import gym
+
+from forkan.rl import DQN
+from forkan.rl.env_wrapper import EnvWrapper
 
 
 def solved_callback(rewards):
@@ -13,18 +15,28 @@ def solved_callback(rewards):
     return True
 
 
-RLC = 'cart-dqn'
+dqn_conf = {
+    'name': 'cart-dqn',
+    'buffer_size': 5e4,
+    'total_timesteps': 1e5,
+    'training_start': 1e3,
+    'target_update_freq': 500,
+    'exploration_fraction': 0.1,
+    'prioritized_replay': True,
+    'double_q': True,
+    'dueling': True,
+    'lr': 5e-4,
+    'gamma': 1.,
+    'batch_size': 128,
+    'gradient_clipping': 10,
+    'reward_clipping': 1,
+    'clean_tensorboard_runs': True,
+    'clean_previous_weights': True,
+    'solved_callback': solved_callback,
+}
 
-cm = ConfigManager([RLC])
+e = gym.make('CartPole-v0')
+e = EnvWrapper(e)
 
-rl_conf = cm.get_config_by_name(RLC)['algorithm']
-ev_conf = cm.get_config_by_name(RLC)['environment']
-
-atype = rl_conf.pop('type')
-etype = ev_conf.pop('type')
-
-rl_conf['solved_callback'] = solved_callback
-
-alg = load_algorithm(atype, etype, rl_conf, ev_conf)
+alg = DQN(e, **dqn_conf)
 alg.learn()
-
