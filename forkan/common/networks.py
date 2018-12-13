@@ -96,4 +96,4 @@ def build_network(input_shape, num_actions, dueling=False, network_type='mini-ml
             logger.critical('Network type {} unknown!'.format(network_type))
             sys.exit(0)
 
-    return output, input_
+    return input_, output

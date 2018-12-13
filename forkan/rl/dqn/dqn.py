@@ -198,15 +198,15 @@ class DQN(BaseAgent):
         self.TARGET_SCOPE = 'target_network'
 
         # build Q and target network; using different scopes to distinguish variables for gradient computation
-        self.q_t, self.q_t_in = build_network(self.obs_shape, self.num_actions, network_type=network_type,
+        self.q_t_in, self.q_t = build_network(self.obs_shape, self.num_actions, network_type=network_type,
                                               dueling=self.dueling, scope=self.Q_SCOPE, summaries=True)
-        self.target_tp1, self.target_tp1_in = build_network(self.obs_shape, self.num_actions, dueling=self.dueling,
+        self.target_tp1_in, self.target_tp1 = build_network(self.obs_shape, self.num_actions, dueling=self.dueling,
                                                             network_type=network_type, scope=self.TARGET_SCOPE)
 
         # double Q learning needs to pass observations t+1 to the q networks for action selection
         # so we reuse already created q network variables but with different input
         if self.double_q:
-            self.q_tp1, self.q_tp1_in = build_network(self.obs_shape, self.num_actions, dueling=self.dueling,
+            self.q_tp1_in, self.q_tp1 = build_network(self.obs_shape, self.num_actions, dueling=self.dueling,
                                                       network_type=network_type, scope=self.Q_SCOPE, reuse=True)
 
         # create replay buffer
