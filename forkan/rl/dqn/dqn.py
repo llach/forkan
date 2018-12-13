@@ -3,23 +3,23 @@ import logging
 import numpy as np
 import tensorflow as tf
 
-from tensorflow.python import debug as tf_debug
 from tabulate import tabulate
 
 from baselines.common.schedules import LinearSchedule
 from baselines.deepq.replay_buffer import ReplayBuffer, PrioritizedReplayBuffer
 
-from forkan import weights_path
-from forkan.common.utils import rename_latest_run, clean_dir, create_dir
+from forkan.rl import BaseAgent
+from forkan.common.utils import rename_latest_run, clean_dir
 from forkan.common.tf_utils import scalar_summary
-from forkan.rl.dqn.networks import build_network
+from forkan.common.networks import build_network
 
 
-class DQN(object):
+class DQN(BaseAgent):
 
     def __init__(self,
                  env,
                  name='default',
+                 alg_name='dqn',
                  network_type='mini-mlp',
                  total_timesteps=5e7,
                  batch_size=32,
@@ -44,13 +44,7 @@ class DQN(object):
                  rolling_reward_mean=20,
                  solved_callback=None,
                  render_training=False,
-                 debug=False,
-                 use_tensorboard=True,
-                 tensorboard_dir='/tmp/tensorboard/dqn/',
-                 tensorboard_suffix=None,
-                 clean_tensorboard_runs=False,
-                 use_checkpoints=True,
-                 clean_previous_weights=False,
+                 **kwargs
                  ):
         """
         Implementation of the Deep Q Learning (DQN) algorithm formulated by Mnih et. al.
@@ -139,34 +133,6 @@ class DQN(object):
         render_training: bool
             whether to render the environment while training
 
-        debug: bool
-            if true, a TensorBoard debugger session is started
-
-        use_tensorboard: bool
-            toggles TensorBoard support. If enabled, variable summaries are created and
-            written to disk in real time while training.
-
-        tensorboard_dir: str
-            Parent directory to save the TensorBoard files to. Within this directory, a new folder is
-            created for every training run of the policy. Folders are named as 'run-X' or 'run-latest',
-            where X stands for the runs ID.
-
-        tensorboard_suffix: str
-            Addition to the foldername for individual runs, could, for example, contain information about
-            hyperparamets used. Foldernames will be of the form 'run-SUFFIX-ID'.
-
-        clean_tensorboard_runs: bool
-            If true, data of other runs is wiped before execution. This exists mainly to avoid
-            disk bloating when testing a lot.
-
-        use_checkpoints: bool
-            Saves the model after each episode and upon every policy improvement. A csv-file
-            is also written to disk alongside the weights containing information about the run.
-
-        clean_previous_weights: bool
-            If true, weights of other runs is wiped before execution. This exists mainly to avoid
-            disk bloating when testing a lot.
-
         """
 
         # instance name
@@ -209,31 +175,19 @@ class DQN(object):
         # call env.render() each training step
         self.render_training = render_training
 
-        # rolling mean reward window
+        # sliding window for reward calc
         self.rolling_reward_mean = rolling_reward_mean
 
-        # tensorboard and debug related variables
-        self.debug = debug
-        self.use_tensorboard = use_tensorboard
-        self.tensorboard_dir = tensorboard_dir
-        self.clean_tensorboard_runs = clean_tensorboard_runs
-        self.tensorboard_suffix = tensorboard_suffix
+        # stores latest measure for best policy, e.g. best mean over last N episodes
+        self.latest_best = 0.0
 
-        # checkpoint
-        self.use_checkpoints = use_checkpoints
-        self.clean_previous_weights = clean_previous_weights
+        super().__init__(env, alg_name, name, **kwargs)
 
         # calculate timestep where epsilon reaches its final value
         self.schedule_timesteps = int(self.total_timesteps * self.exploration_fraction)
 
-        # concat name of instance to path -> distinction between saved instances
-        self.checkpoint_dir = '{}/dqn/{}/'.format(weights_path, name)
-
         # sanity checks
         assert 0.0 < self.tau <= 1.0
-
-        # logger for different levels
-        self.logger = logging.getLogger(__name__)
 
         # env specific parameter
         self.obs_shape = env.observation_space.shape
@@ -312,58 +266,11 @@ class DQN(object):
         # global tf.Session and Graph init
         self.sess = tf.Session()
 
-        # launch debug session
-        if self.debug:
-            self.sess = tf_debug.TensorBoardDebugWrapperSession(self.sess, "localhost:6064")
-
-        # create tensorboard summaries
-        if self.use_tensorboard:
-            self._setup_tensorboard()
-
-        # init variables
-        self.sess.run(tf.global_variables_initializer())
+        # init tensorboard, variables and debug
+        self._finalize_init()
 
         # sync networks before training
         self.sess.run(self.update_target_ops)
-
-        # flag indicating whether this instance is completely trained
-        self.is_trained = False
-
-        # if this instance is working with checkpoints, we'll check whether
-        # one is already there. if so, we continue training from that checkpoint,
-        # i.e. load the saved weights into target and online network.
-        if self.use_checkpoints:
-
-            # remove old weights if needed and not already trained until the end
-            if self.clean_previous_weights and not os.path.isfile('{}/done'.format(self.checkpoint_dir)):
-                clean_dir(self.checkpoint_dir)
-
-            # be sure that the directory exits
-            create_dir(self.checkpoint_dir)
-
-            # Saver objects handles writing and reading protobuf weight files
-            self.saver = tf.train.Saver(var_list=tf.all_variables())
-
-            # file handle for writing episode summaries
-            self.csvlog = open('{}/progress.csv'.format(self.checkpoint_dir), 'a')
-
-            # write headline if file is not empty
-            if not os.stat('{}/progress.csv'.format(self.checkpoint_dir)).st_size == 0:
-                self.csvlog.write('episode, epsilon, reward\n')
-
-            # load already saved weights
-            self._load()
-
-    def __del__(self):
-        """ Cleanup after object finalization """
-
-        # close tf.Session
-        if hasattr(self, 'sess'):
-           self.sess.close()
-
-        # close filehandle
-        if hasattr(self, 'csvlog'):
-            self.csvlog.close()
 
     def _setup_tensorboard(self):
         """
@@ -473,45 +380,6 @@ class DQN(object):
 
         return feed_d
 
-    def _save(self, weight_dir='latest'):
-        """ Saves current weights under CHECKPOINT_DIR/weight_dir/ """
-
-        self.saver.save(self.sess, '{}/{}/'.format(self.checkpoint_dir, weight_dir))
-
-    def _load(self):
-        """
-        Loads model weights. If the done-file exists, we know that
-        training finished for this set of weights, so we
-
-        """
-        # check whether the model being loaded was fully trained
-        if os.path.isfile('{}/done'.format(self.checkpoint_dir)):
-            self.logger.debug('Loading finished weights!')
-            self.saver.restore(self.sess, '{}/best/'.format(self.checkpoint_dir))
-
-            # set model as trained
-            self.is_trained = True
-        elif os.path.isdir('{}/latest/'.format(self.checkpoint_dir)):
-            self.logger.warning('Loading pre-trained weights. As this model is not marked as \'done\', \n' +
-                                'training will start from t=0 using these weights (this includes filling \n' +
-                                'the replay buffer). Make sure to have a solved_callback specified to \n' +
-                                'avoid training a good policy for too long.')
-            self.saver.restore(self.sess, '{}/latest/'.format(self.checkpoint_dir))
-        else:
-            self.logger.debug('No weights to load found!')
-
-    def _finalize_training(self):
-        """ Takes care of things once training finished """
-
-        # set model as trained
-        self.is_trained = True
-
-        # create done-file
-        with open('{}/done'.format(self.checkpoint_dir), 'w'): pass
-
-        # close file handle to csv log file
-        self.csvlog.close()
-
     def learn(self):
         """ Learns Q function for a given amount of timesteps """
 
@@ -583,9 +451,14 @@ class DQN(object):
                     ]
                     print('\n{}'.format(tabulate(result_table)))
 
-                    # if the policy improved, save as new best
-                    if len(episode_rewards) >= 2:
-                        if episode_rewards[-1] > episode_rewards[-2]:
+                    # if the policy improved, save as new best ... achieving a good reward in one episode
+                    # might not be the best metric. continuously achieving good rewards would better
+                    if len(episode_rewards) >= 25:
+                        mr = np.mean(episode_rewards[-self.rolling_reward_mean:])
+                        if mr >= self.latest_best:
+                            self.latest_best = mr
+                            self.logger.info('Saving new best policy with mean[{}]_r = {} ...'.format(
+                                self.rolling_reward_mean, mr))
                             self._save('best')
 
                     # save latest policy

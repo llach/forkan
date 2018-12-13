@@ -2,6 +2,10 @@ import gym
 import sys
 import logging
 
+from forkan.rl.base_agent import BaseAgent
+
+from forkan.rl.env_wrapper import EnvWrapper
+
 from forkan.rl.dqn.dqn import DQN
 from forkan.rl.env_wrapper import EnvWrapper
 
