@@ -297,10 +297,6 @@ class DQN(BaseAgent):
         with tf.variable_scope('gradients'):
             for g in self.gradients: tf.summary.histogram('{}-grad'.format(g[1].name), g[0])
 
-        # this operation can be run in a tensorflow session and will return all summaries
-        # created above.
-        self.merge_op = tf.summary.merge_all()
-
     def _loss(self):
         """ Defines loss as layed out in the original Nature paper """
 

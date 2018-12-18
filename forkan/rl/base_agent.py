@@ -106,7 +106,6 @@ class BaseAgent(object):
 
         # create tensorboard summaries
         if self.use_tensorboard:
-            self._setup_tensorboard()
 
             # clean previous runs or add new one
             if not self.clean_tensorboard_runs:
@@ -116,7 +115,16 @@ class BaseAgent(object):
 
             # if there is a directory suffix given, it will be included before the run number in the filename
             tb_dir_suffix = '' if self.tensorboard_suffix is None else '-{}'.format(self.tensorboard_suffix)
-            self.writer = tf.summary.FileWriter('{}/run{}-latest'.format(self.tensorboard_dir, tb_dir_suffix),
+            self.tensorboard_dir = '{}/run{}-latest'.format(self.tensorboard_dir, tb_dir_suffix)
+
+            # call child method to do preparations
+            self._setup_tensorboard()
+
+            # this operation can be run in a tensorflow session and will return all summaries
+            # created above.
+            self.merge_op = tf.summary.merge_all()
+
+            self.writer = tf.summary.FileWriter(self.tensorboard_dir,
                                                 graph=tf.get_default_graph())
 
         # flag indicating whether this instance is completely trained
