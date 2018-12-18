@@ -5,7 +5,7 @@ import tensorflow as tf
 from tensorflow.python import debug as tf_debug
 
 from forkan import weights_path
-from forkan.common.utils import clean_dir, create_dir
+from forkan.common.utils import create_dir, rename_latest_run, clean_dir
 
 
 class BaseAgent(object):
@@ -107,6 +107,17 @@ class BaseAgent(object):
         # create tensorboard summaries
         if self.use_tensorboard:
             self._setup_tensorboard()
+
+            # clean previous runs or add new one
+            if not self.clean_tensorboard_runs:
+                rename_latest_run(self.tensorboard_dir)
+            else:
+                clean_dir(self.tensorboard_dir)
+
+            # if there is a directory suffix given, it will be included before the run number in the filename
+            tb_dir_suffix = '' if self.tensorboard_suffix is None else '-{}'.format(self.tensorboard_suffix)
+            self.writer = tf.summary.FileWriter('{}/run{}-latest'.format(self.tensorboard_dir, tb_dir_suffix),
+                                                graph=tf.get_default_graph())
 
         # flag indicating whether this instance is completely trained
         self.is_trained = False

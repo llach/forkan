@@ -1,5 +1,3 @@
-import os
-import logging
 import numpy as np
 import tensorflow as tf
 
@@ -9,7 +7,6 @@ from baselines.common.schedules import LinearSchedule
 from baselines.deepq.replay_buffer import ReplayBuffer, PrioritizedReplayBuffer
 
 from forkan.rl import BaseAgent
-from forkan.common.utils import rename_latest_run, clean_dir
 from forkan.common.tf_utils import scalar_summary
 from forkan.common.networks import build_network
 
@@ -303,17 +300,6 @@ class DQN(BaseAgent):
         # this operation can be run in a tensorflow session and will return all summaries
         # created above.
         self.merge_op = tf.summary.merge_all()
-
-        # clean previous runs or add new one
-        if not self.clean_tensorboard_runs:
-            rename_latest_run(self.tensorboard_dir)
-        else:
-            clean_dir(self.tensorboard_dir)
-
-        # if there is a directory suffix given, it will be included before the run number in the filename
-        tb_dir_suffix = '' if self.tensorboard_suffix is None else '-{}'.format(self.tensorboard_suffix)
-        self.writer = tf.summary.FileWriter('{}/run{}-latest'.format(self.tensorboard_dir, tb_dir_suffix),
-                                            graph=tf.get_default_graph())
 
     def _loss(self):
         """ Defines loss as layed out in the original Nature paper """
