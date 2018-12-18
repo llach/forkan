@@ -61,6 +61,8 @@ def ls_dir(d):
 def clean_dir(path):
     """ Deletes subdirs of path """
 
+    logger.debug('Cleaning dir {}'.format(path))
+
     # sanity check
     if not os.path.isdir(path):
         return
