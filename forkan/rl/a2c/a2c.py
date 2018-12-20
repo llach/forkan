@@ -3,7 +3,7 @@ import tensorflow as tf
 
 from forkan.rl import BaseAgent
 from forkan.common.policies import build_policy
-from forkan.common.tf_utils import scalar_summary
+from forkan.common.tf_utils import scalar_summary, entropy_from_logits
 
 from tabulate import tabulate
 
@@ -11,8 +11,6 @@ from tabulate import tabulate
 TODO's
 
 - value loss VERY high => print value loss in openai impl ( maybe R is calculated wrong?)
-- entropy OpenAI style
-- also get rid of pis, argmax on logits
 - clipping with .5 leads to nan => use tf.gradients instead compute gradients (whats the difference?
                                                                     maybe Optimizer calcs already drive gradients 
                                                                     close to zero. clipping by norm drives values
@@ -20,6 +18,7 @@ TODO's
                                                                     territory.??)
 
 """
+
 
 class A2C(BaseAgent):
 
@@ -114,8 +113,8 @@ class A2C(BaseAgent):
         self.num_actions = env.action_space.n
 
         # create value net, action net and policy output (and get input placeholder)
-        self.obs_ph, self.logits, self.pi, self.value = build_policy(self.obs_shape, self.num_actions, scope='policy',
-                                                                     policy_type=self.policy_type, reuse=False)
+        self.obs_ph, self.logits, self.value = build_policy(self.obs_shape, self.num_actions, scope='policy',
+                                                            policy_type=self.policy_type, reuse=False)
 
         # store list of policy network variables
         self.policy_net_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='policy')
@@ -130,7 +129,7 @@ class A2C(BaseAgent):
         self.neglogp = tf.nn.softmax_cross_entropy_with_logits_v2(labels=self.oh_actions, logits=self.logits)
         self.pi_loss = tf.reduce_mean(self.neglogp * self.adv_ph)
 
-        self.pi_entropy = tf.reduce_mean(-(self.pi * tf.log(self.pi)))
+        self.pi_entropy = tf.reduce_mean(entropy_from_logits(self.logits))
         self.policy_loss = self.pi_loss + self.beta * self.pi_entropy
 
         # construct value loss
@@ -183,19 +182,16 @@ class A2C(BaseAgent):
         with tf.variable_scope('gradients'):
             for g in self.gradients: tf.summary.histogram('{}-grad'.format(g[1].name), g[0])
 
-    def _gradient_fd(self, R_js, obses, pis, logis, actions, values, steps_t, mean_ret=None):
+    def _gradient_fd(self, R_js, obses, logis, actions, values, steps_t, mean_ret=None):
         """ Takes multistep-batch and returns feed dict for gradient computation. """
 
         # transform shapes of inputs to match batch shape convention
-        pis = np.reshape(pis, (steps_t, self.num_actions))
         logis = np.reshape(logis, (steps_t, self.num_actions))
         actions = np.expand_dims(actions, 1)
         values = np.expand_dims(values, 1)
 
         # calculate advantage values
         advs = (R_js - values)
-
-        assert pis.shape[0] == actions.shape[0]
 
         # we assign values to defined tensors here so we
         # avoid one additional forward pass
@@ -205,7 +201,6 @@ class A2C(BaseAgent):
             self.obs_ph: obses,
             self.R_j_ph: R_js,
             self.logits: logis,
-            self.pi: pis,
             self.value: values,
         }
 
@@ -229,9 +224,10 @@ class A2C(BaseAgent):
 
         cur_ent = 0.0
 
+        self.logger.info('Starting training!')
+
         while T < self.total_timesteps:
 
-            pis = []
             obses = []
             logis = []
             actions = np.array([])
@@ -245,18 +241,17 @@ class A2C(BaseAgent):
             for n in range(self.tmax):
 
                 # calculate pi & state value
-                logi, pi, val = self.sess.run([self.logits, self.pi, self.value], feed_dict={
+                logi, val = self.sess.run([self.logits, self.value], feed_dict={
                     self.obs_ph: [obs_t]
                 })
 
                 # chose action based on highest action
-                action = np.argmax(pi, axis=1)[0]
+                action = np.argmax(logi, axis=1)[0]
 
                 # observe o+1, r+1
                 obs_tp1, r_t, d_t, _ = self.env.step(action)
 
                 # store data
-                pis.append(pi)
                 logis.append(logi)
                 obses.append(obs_t)
                 actions = np.append(actions, [action])
@@ -304,7 +299,6 @@ class A2C(BaseAgent):
             g_feed = self._gradient_fd(R_js=R_j,
                                        obses=obses,
                                        logis=logis,
-                                       pis=pis,
                                        actions=actions,
                                        values=values,
                                        steps_t=steps_t,

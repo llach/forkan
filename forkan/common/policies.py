@@ -40,10 +40,6 @@ def build_policy(input_shape, num_actions, policy_type='mini-mlp', scope='', reu
                 # one linear layer for action values, e.g. logits
                 action_values = tf.contrib.layers.fully_connected(mlp, num_actions, activation_fn=None)
 
-            with tf.variable_scope('PI', reuse=reuse):
-                # softmax of logits calculates PI(a)
-                pi = tf.nn.softmax(action_values, axis=1)
-
             with tf.variable_scope('state_values', reuse=reuse):
                 # linear activation with only one neuron representing the state value
                 state_value = tf.contrib.layers.fully_connected(mlp, 1, activation_fn=None)
@@ -52,4 +48,4 @@ def build_policy(input_shape, num_actions, policy_type='mini-mlp', scope='', reu
             logger.critical('Policy type {} unknown!'.format(policy_type))
             sys.exit(0)
 
-    return input_, action_values, pi, state_value
+    return input_, action_values, state_value
