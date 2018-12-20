@@ -181,7 +181,7 @@ class BaseAgent(object):
 
         """
         # check whether the model being loaded was fully trained
-        if os.path.isfile('{}/done'.format(self.checkpoint_dir)):
+        if os.path.isfile('{}/done'.format(self.checkpoint_dir)) and os.path.isdir('{}/best/'.format(self.checkpoint_dir)):
             self.logger.debug('Loading finished weights from {}'.format(self.checkpoint_dir))
             self.saver.restore(self.sess, '{}/best/'.format(self.checkpoint_dir))
 
