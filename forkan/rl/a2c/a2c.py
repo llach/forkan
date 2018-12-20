@@ -11,12 +11,7 @@ from tabulate import tabulate
 TODO's
 
 - value loss VERY high => print value loss in openai impl ( maybe R is calculated wrong?)
-- clipping with .5 leads to nan => use tf.gradients instead compute gradients (whats the difference?
-                                                                    maybe Optimizer calcs already drive gradients 
-                                                                    close to zero. clipping by norm drives values
-                                                                    further towards numerically unstable 
-                                                                    territory.??)
-
+- multithreading
 """
 
 
@@ -29,13 +24,14 @@ class A2C(BaseAgent):
                  policy_type='mini-mlp',
                  total_timesteps=5e7,
                  lr=1e-3,
-                 beta=0.01,
+                 entropy_coef=0.01,
                  gamma=0.99,
                  tmax=5,
                  v_loss_coef=0.5,
-                 gradient_clipping=None,
+                 max_grad_norm=None,
                  reward_clipping=None,
                  solved_callback=None,
+                 print_freq=None,
                  render_training=False,
                  **kwargs,
                  ):
@@ -63,7 +59,7 @@ class A2C(BaseAgent):
         lr: float
             learning rate
 
-        beta: float
+        entropy_coef: float
             entropy coefficient in policy loss
 
         gamma: float
@@ -75,8 +71,8 @@ class A2C(BaseAgent):
         v_loss_coef: float
             value function loss coefficient in final loss
 
-         gradient_clipping: int
-                    if not None, gradients are clipped by this value by norm
+        max_grad_norm: int
+            if not None, gradients are clipped by this value by norm
 
         reward_clipping: float
             rewards will be clipped to this value if not None
@@ -84,6 +80,9 @@ class A2C(BaseAgent):
         solved_callback: function
            function which gets as an input the episode rewards as an array and must return a bool.
            if returned True, the training is considered as done and therefore prematurely interrupted.
+
+        print_freq: int
+            prints status every x episodes to stdout
 
         render_training: bool
             whether to render the environment while training
@@ -95,15 +94,16 @@ class A2C(BaseAgent):
         # hyperparameter
         self.total_timesteps = total_timesteps
         self.lr = lr
-        self.beta = beta
+        self.entropy_coef = entropy_coef
         self.gamma = gamma
 
         self.tmax = tmax
         self.v_loss_coef = v_loss_coef
-        self.gradient_clipping = gradient_clipping
+        self.max_grad_norm = max_grad_norm
         self.reward_clipping = reward_clipping
 
         self.solved_callback = solved_callback
+        self.print_freq = print_freq
         self.render_training = render_training
 
         super().__init__(env, alg_name, name, **kwargs)
@@ -112,12 +112,19 @@ class A2C(BaseAgent):
         self.obs_shape = env.observation_space.shape
         self.num_actions = env.action_space.n
 
+        # scope name for policy tensors
+        self.policy_scope = 'policy'
+
         # create value net, action net and policy output (and get input placeholder)
-        self.obs_ph, self.logits, self.value = build_policy(self.obs_shape, self.num_actions, scope='policy',
+        self.obs_ph, self.logits, self.value = build_policy(self.obs_shape, self.num_actions, scope=self.policy_scope,
                                                             policy_type=self.policy_type, reuse=False)
 
         # store list of policy network variables
-        self.policy_net_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='policy')
+        def _get_trainable_variables(scope):
+            with tf.variable_scope(scope):
+                return tf.trainable_variables()
+
+        self.policy_net_vars = _get_trainable_variables(scope=self.policy_scope)
 
         # setup placeholders for later
         self.adv_ph = tf.placeholder(tf.float32, (None, 1), name='advantage-values')
@@ -130,7 +137,7 @@ class A2C(BaseAgent):
         self.pi_loss = tf.reduce_mean(self.neglogp * self.adv_ph)
 
         self.pi_entropy = tf.reduce_mean(entropy_from_logits(self.logits))
-        self.policy_loss = self.pi_loss + self.beta * self.pi_entropy
+        self.policy_loss = self.pi_loss + self.entropy_coef * self.pi_entropy
 
         # construct value loss
         self.value_loss = tf.reduce_mean(tf.losses.mean_squared_error(labels=self.R_j_ph, predictions=self.value))
@@ -145,10 +152,10 @@ class A2C(BaseAgent):
         self.gradients = self.opt.compute_gradients(self.loss, var_list=self.policy_net_vars)
 
         # clip gradients by norm
-        if self.gradient_clipping is not None:
+        if self.max_grad_norm is not None:
             for idx, (grad, var) in enumerate(self.gradients):
                 if grad is not None:
-                    self.gradients[idx] = (tf.clip_by_norm(grad, self.gradient_clipping), var)
+                    self.gradients[idx] = (tf.clip_by_norm(grad, self.max_grad_norm), var)
 
         # create training op
         self.train_op = self.opt.apply_gradients(self.gradients)
@@ -275,13 +282,15 @@ class A2C(BaseAgent):
                     if len(episode_returns) > 20:
                         mean_ret = np.mean(episode_returns[-20:])
 
-                    result_table = [
-                        ['T', T],
-                        ['episode', len(episode_returns)],
-                        ['mean return', mean_ret],
-                        ['policy entropy', cur_ent],
-                    ]
-                    # print('\n{}'.format(tabulate(result_table)))
+                    if self.print_freq is not None and len(episode_returns) % self.print_freq == 0:
+                        result_table = [
+                            ['T', T],
+                            ['episode', len(episode_returns)],
+                            ['mean return', mean_ret],
+                            ['policy entropy', cur_ent],
+                        ]
+
+                        print('\n{}'.format(tabulate(result_table)))
 
                     break
 
