@@ -15,6 +15,43 @@ from keras.utils import to_categorical
 logger = logging.getLogger()
 
 
+def discount_with_dones(rewards, dones, gamma):
+    """
+    Calculates discounted rewards.
+
+    From OpenAI basline's A2C.
+
+    Parameters
+    ----------
+    rewards: list
+        list of rewards with the last value being the state value
+
+    dones: list
+        list of dones as floats
+
+    gamma: float
+        discount factor
+
+    Returns
+    -------
+        list of discounted rewards
+
+    """
+    discounted = []
+    r = 0
+
+    # discounted rewards are calculated on the reversed reward list.
+    # that returns are calculated in descending order is easy to
+    # overlook in the original pseudocode.
+    # when writing down an example of the pseudocode, it is clear, that
+    # r_t + gamma * V(s_tp1) is calculated for each list element and
+    # this is also what is done here.
+    for reward, done in zip(rewards[::-1], dones[::-1]):
+        r = reward + gamma*r*(1.-done)
+        discounted.append(r)
+    return discounted[::-1]
+
+
 def store_args(method):
     """Stores provided method args as instance attributes. From OpenAI baselines HER.
     """

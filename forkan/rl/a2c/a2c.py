@@ -3,6 +3,7 @@ import tensorflow as tf
 
 from forkan.rl import BaseAgent
 from forkan.common.policies import build_policy
+from forkan.common.utils import discount_with_dones
 from forkan.common.tf_utils import scalar_summary, entropy_from_logits
 
 from tabulate import tabulate
@@ -10,8 +11,8 @@ from tabulate import tabulate
 """
 TODO's
 
-- value loss VERY high => print value loss in openai impl ( maybe R is calculated wrong?)
 - multithreading
+- noise on logits?
 """
 
 
@@ -116,8 +117,8 @@ class A2C(BaseAgent):
         self.policy_scope = 'policy'
 
         # create value net, action net and policy output (and get input placeholder)
-        self.obs_ph, self.logits, self.value = build_policy(self.obs_shape, self.num_actions, scope=self.policy_scope,
-                                                            policy_type=self.policy_type, reuse=False)
+        self.obs_ph, self.logits, self.values = build_policy(self.obs_shape, self.num_actions, scope=self.policy_scope,
+                                                             policy_type=self.policy_type, reuse=False)
 
         # store list of policy network variables
         def _get_trainable_variables(scope):
@@ -140,7 +141,7 @@ class A2C(BaseAgent):
         self.policy_loss = self.pi_loss + self.entropy_coef * self.pi_entropy
 
         # construct value loss
-        self.value_loss = tf.reduce_mean(tf.losses.mean_squared_error(labels=self.R_j_ph, predictions=self.value))
+        self.value_loss = tf.reduce_mean(tf.losses.mean_squared_error(labels=self.R_j_ph, predictions=self.values))
 
         # final loss
         self.loss = self.policy_loss + self.v_loss_coef * self.value_loss
@@ -174,11 +175,11 @@ class A2C(BaseAgent):
 
         self.ret_ph = tf.placeholder(tf.float32, (), name='mean-return')
 
-        scalar_summary('loss', self.loss)
         scalar_summary('mean-return', self.ret_ph)
-        scalar_summary('policy-entropy', self.pi_entropy)
+        scalar_summary('loss', self.loss)
+        scalar_summary('value-loss', self.value_loss)
         scalar_summary('policy-loss', self.policy_loss)
-        scalar_summary('value-lass', self.value_loss)
+        scalar_summary('policy-entropy', self.pi_entropy)
         scalar_summary('R', tf.reduce_mean(self.R_j_ph))
 
         # plot network weights
@@ -192,10 +193,11 @@ class A2C(BaseAgent):
     def _gradient_fd(self, R_js, obses, logis, actions, values, steps_t, mean_ret=None):
         """ Takes multistep-batch and returns feed dict for gradient computation. """
 
-        # transform shapes of inputs to match batch shape convention
+        # convert to correctly shaped array
         logis = np.reshape(logis, (steps_t, self.num_actions))
-        actions = np.expand_dims(actions, 1)
-        values = np.expand_dims(values, 1)
+        actions = np.reshape(actions, (steps_t, 1))
+        values = np.reshape(values, (steps_t, 1))
+        R_js = np.reshape(R_js, (steps_t, 1))
 
         # calculate advantage values
         advs = (R_js - values)
@@ -208,13 +210,19 @@ class A2C(BaseAgent):
             self.obs_ph: obses,
             self.R_j_ph: R_js,
             self.logits: logis,
-            self.value: values,
+            self.values: values,
         }
 
         if self.use_tensorboard:
             _fd[self.ret_ph] = mean_ret
 
         return _fd
+
+    def value(self, obs):
+        """ Returns value of obs as a single number, not an array. """
+        return self.sess.run([self.values], feed_dict={
+                    self.obs_ph: [obs]
+                })[0][0]
 
     def learn(self):
         """ Learns Q function for a given amount of timesteps """
@@ -237,10 +245,10 @@ class A2C(BaseAgent):
 
             obses = []
             logis = []
-            actions = np.array([])
-            rewards = np.array([])
-            dones = np.array([])
-            values = np.array([])
+            actions = []
+            rewards = []
+            dones = []
+            values = []
 
             steps_t = 0
 
@@ -248,7 +256,7 @@ class A2C(BaseAgent):
             for n in range(self.tmax):
 
                 # calculate pi & state value
-                logi, val = self.sess.run([self.logits, self.value], feed_dict={
+                logi, val = self.sess.run([self.logits, self.values], feed_dict={
                     self.obs_ph: [obs_t]
                 })
 
@@ -261,10 +269,10 @@ class A2C(BaseAgent):
                 # store data
                 logis.append(logi)
                 obses.append(obs_t)
-                actions = np.append(actions, [action])
-                rewards = np.append(rewards, r_t)
-                dones = np.append(dones, d_t)
-                values = np.append(values, [val])
+                actions.append([action])
+                rewards.append(r_t)
+                dones.append(float(d_t))
+                values.append([val])
 
                 # t <-- t + 1
                 T += 1
@@ -294,15 +302,14 @@ class A2C(BaseAgent):
 
                     break
 
-            # set  to either zero or the value of the last multistep state
-            R = 0 if dones[-1] else values[-1]
-
-            R_j = []
-            for i in range(steps_t):
-                if i == 0:
-                    R_j.append([rewards[i] + self.gamma * R])
-                else:
-                    R_j.append([rewards[i] + self.gamma * R_j[-1][0]])
+            # calculate discounted rewards
+            if dones[-1] == 0:
+                # we append the value for V(o_tp1) to the end of the list
+                # this will the first value for R as in the original pseudocode
+                val = self.value(obs_t)
+                R_j = discount_with_dones(rewards + list(val), dones + [0], self.gamma)[:-1]
+            else:
+                R_j = discount_with_dones(rewards, dones, self.gamma)
 
             # build feed dict for gradient and/or training operation
             g_feed = self._gradient_fd(R_js=R_j,
