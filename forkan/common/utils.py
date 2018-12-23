@@ -17,7 +17,8 @@ logger = logging.getLogger()
 
 def discount_with_dones(rewards, dones, gamma):
     """
-    Calculates discounted rewards.
+    Calculates discounted rewards. This is still valid if the episode
+    terminated within the sequence.
 
     From OpenAI basline's A2C.
 
