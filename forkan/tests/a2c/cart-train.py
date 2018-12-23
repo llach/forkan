@@ -1,7 +1,4 @@
-import gym
-
-from forkan.rl import A2C
-from forkan.rl.env_wrapper import EnvWrapper
+from forkan.rl import make, A2C
 
 
 def solved_callback(rewards):
@@ -18,19 +15,25 @@ def solved_callback(rewards):
 a2c_conf = {
     'name': 'cart-a2c',
     'total_timesteps': 5e4,
-    'lr': 5e-3,
+    'lr': 1e-2,
     'gamma': .99,
-    'beta': 0.02,
+    'entropy_coef': 0.1,
+    'v_loss_coef': 0.05,
     'gradient_clipping': None,
     'reward_clipping': 1,
     'use_tensorboard': True,
     'clean_tensorboard_runs': True,
     'clean_previous_weights': True,
+    'print_freq': 10,
     'solved_callback': solved_callback,
 }
 
-e = gym.make('CartPole-v0')
-e = EnvWrapper(e)
+env_conf = {
+    'eid': 'CartPole-v0',
+    'num_envs': 2,
+}
+
+e = make(**env_conf)
 
 alg = A2C(e, **a2c_conf)
 alg.learn()

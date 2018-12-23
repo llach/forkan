@@ -1,7 +1,7 @@
 import gym
 
 from forkan.rl import DQN
-from forkan.rl.env_wrapper import EnvWrapper
+from forkan.rl.repeat_env import RepeatEnv
 
 
 def solved_callback(rewards):
@@ -36,7 +36,7 @@ dqn_conf = {
 }
 
 e = gym.make('CartPole-v0')
-e = EnvWrapper(e)
+e = RepeatEnv(e)
 
 alg = DQN(e, **dqn_conf)
 alg.learn()

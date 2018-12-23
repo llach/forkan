@@ -2,7 +2,7 @@ import gym
 
 from forkan.rl import DQN
 from forkan.rl.atari_env import AtariEnv
-from forkan.rl.env_wrapper import EnvWrapper
+from forkan.rl.repeat_env import RepeatEnv
 
 dqn_conf = {
     'name': 'breakout-dqn',
@@ -33,7 +33,7 @@ wrapper_conf = {
 
 e = gym.make('Breakout-v0')
 e = AtariEnv(e, **atari_env_conf)
-e = EnvWrapper(e, **wrapper_conf)
+e = RepeatEnv(e, **wrapper_conf)
 
 alg = DQN(e, **dqn_conf)
 alg.learn()
