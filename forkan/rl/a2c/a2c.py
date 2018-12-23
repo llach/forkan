@@ -11,7 +11,6 @@ from tabulate import tabulate
 """
 TODO's
 
-- multithreading
 - noise on logits?
 """
 
@@ -109,6 +108,10 @@ class A2C(BaseAgent):
 
         super().__init__(env, alg_name, name, **kwargs)
 
+        # number of environments
+        self.num_envs = env.num_envs
+        self.batch_size = self.num_envs * self.tmax
+
         # env specific parameter
         self.obs_shape = env.observation_space.shape
         self.num_actions = env.action_space.n
@@ -130,7 +133,7 @@ class A2C(BaseAgent):
         # setup placeholders for later
         self.adv_ph = tf.placeholder(tf.float32, (None, 1), name='advantage-values')
         self.actions_ph = tf.placeholder(tf.int32, (None, 1), name='actions')
-        self.R_j_ph = tf.placeholder(tf.float32, (None, 1), name='discounted-reward')
+        self.dis_rew_ph = tf.placeholder(tf.float32, (None, 1), name='discounted-reward')
 
         # construct policy loss
         self.oh_actions = tf.one_hot(self.actions_ph, self.num_actions)
@@ -141,7 +144,7 @@ class A2C(BaseAgent):
         self.policy_loss = self.pi_loss + self.entropy_coef * self.pi_entropy
 
         # construct value loss
-        self.value_loss = tf.reduce_mean(tf.losses.mean_squared_error(labels=self.R_j_ph, predictions=self.values))
+        self.value_loss = tf.reduce_mean(tf.losses.mean_squared_error(labels=self.dis_rew_ph, predictions=self.values))
 
         # final loss
         self.loss = self.policy_loss + self.v_loss_coef * self.value_loss
@@ -176,11 +179,16 @@ class A2C(BaseAgent):
         self.ret_ph = tf.placeholder(tf.float32, (), name='mean-return')
 
         scalar_summary('mean-return', self.ret_ph)
-        scalar_summary('loss', self.loss)
-        scalar_summary('value-loss', self.value_loss)
-        scalar_summary('policy-loss', self.policy_loss)
-        scalar_summary('policy-entropy', self.pi_entropy)
-        scalar_summary('R', tf.reduce_mean(self.R_j_ph))
+
+        with tf.variable_scope('loss'):
+            scalar_summary('loss', self.loss)
+            scalar_summary('value-loss', self.value_loss)
+            scalar_summary('policy-loss', self.policy_loss)
+            scalar_summary('policy-entropy', self.pi_entropy)
+
+        with tf.variable_scope('value'):
+            scalar_summary('value_target', tf.reduce_mean(self.dis_rew_ph))
+            scalar_summary('value', tf.reduce_mean(self.values))
 
         # plot network weights
         with tf.variable_scope('weights'):
@@ -190,17 +198,11 @@ class A2C(BaseAgent):
         with tf.variable_scope('gradients'):
             for g in self.gradients: tf.summary.histogram('{}-grad'.format(g[1].name), g[0])
 
-    def _gradient_fd(self, R_js, obses, logis, actions, values, steps_t, mean_ret=None):
+    def _gradient_fd(self, dis_rew, obses, logis, actions, values, mean_ret=None):
         """ Takes multistep-batch and returns feed dict for gradient computation. """
 
-        # convert to correctly shaped array
-        logis = np.reshape(logis, (steps_t, self.num_actions))
-        actions = np.reshape(actions, (steps_t, 1))
-        values = np.reshape(values, (steps_t, 1))
-        R_js = np.reshape(R_js, (steps_t, 1))
-
         # calculate advantage values
-        advs = (R_js - values)
+        advs = (dis_rew - values)
 
         # we assign values to defined tensors here so we
         # avoid one additional forward pass
@@ -208,7 +210,7 @@ class A2C(BaseAgent):
             self.adv_ph: advs,
             self.actions_ph: actions,
             self.obs_ph: obses,
-            self.R_j_ph: R_js,
+            self.dis_rew_ph: dis_rew,
             self.logits: logis,
             self.values: values,
         }
@@ -219,13 +221,13 @@ class A2C(BaseAgent):
         return _fd
 
     def value(self, obs):
-        """ Returns value of obs as a single number, not an array. """
+        """ Returns batched values of obs. """
         return self.sess.run([self.values], feed_dict={
-                    self.obs_ph: [obs]
-                })[0][0]
+                    self.obs_ph: obs
+                })[0]
 
     def learn(self):
-        """ Learns Q function for a given amount of timesteps """
+        """ Learns Q function for a given amount of timesteps. """
 
         # reset env, store first observation
         obs_t = self.env.reset()
@@ -233,99 +235,115 @@ class A2C(BaseAgent):
         # real timesteps
         T = 0
 
-        episode_returns = []
-        epi_ret = 0.0
+        # some statistics
+        cur_eps_rets = np.zeros((self.num_envs,), np.float32)
+        past_returns = []
         mean_ret = 0.0
-
-        cur_ent = 0.0
 
         self.logger.info('Starting training!')
 
         while T < self.total_timesteps:
 
-            obses = []
-            logis = []
-            actions = []
-            rewards = []
-            dones = []
-            values = []
-
-            steps_t = 0
+            obses, logis, actions, rewards, dones, values = [], [], [], [], [], []
 
             # perform multisteps
             for n in range(self.tmax):
 
                 # calculate pi & state value
                 logi, val = self.sess.run([self.logits, self.values], feed_dict={
-                    self.obs_ph: [obs_t]
+                    self.obs_ph: obs_t
                 })
 
                 # chose action based on highest action
-                action = np.argmax(logi, axis=1)[0]
+                acs = np.argmax(logi, axis=1)
 
                 # observe o+1, r+1
-                obs_tp1, r_t, d_t, _ = self.env.step(action)
+                obs_tp1, r_t, d_t, _ = self.env.step(acs)
 
                 # store data
                 logis.append(logi)
                 obses.append(obs_t)
-                actions.append([action])
+                actions.append(acs)
                 rewards.append(r_t)
-                dones.append(float(d_t))
-                values.append([val])
+                dones.append(d_t)
+                values.append(val)
 
                 # t <-- t + 1
                 T += 1
-                steps_t += 1
                 obs_t = obs_tp1
 
-                epi_ret += r_t
+                # we check for each env whether it finised, otherwise store rewards
+                # resets are not needed, they happen in the threads after episode termination
+                for n, (re, do) in enumerate(zip(r_t, d_t)):
 
-                # we break if episode ended
-                if d_t:
-                    obs_t = self.env.reset()
-                    episode_returns.append(epi_ret)
-                    epi_ret = 0.0
+                    # accumulate reward for this step
+                    cur_eps_rets[n] += re
 
-                    if len(episode_returns) > 20:
-                        mean_ret = np.mean(episode_returns[-20:])
+                    if do:
+                        # store final reward in list
+                        past_returns.append(cur_eps_rets[n])
 
-                    if self.print_freq is not None and len(episode_returns) % self.print_freq == 0:
-                        result_table = [
-                            ['T', T],
-                            ['episode', len(episode_returns)],
-                            ['mean return', mean_ret],
-                            ['policy entropy', cur_ent],
-                        ]
+                        # zero reward
+                        cur_eps_rets[n] *= 0
 
-                        print('\n{}'.format(tabulate(result_table)))
+                        # calculate mean returns
+                        if len(past_returns) > 20:
+                            mean_ret = np.mean(past_returns[-20:])
 
-                    break
+                        if self.print_freq is not None and len(past_returns) % self.print_freq == 0:
+                            result_table = [
+                                ['T', T],
+                                ['episode', len(past_returns)],
+                                ['mean return', mean_ret],
+                            ]
+
+                            print('\n{}'.format(tabulate(result_table)))
+
+            # init discounted returns array
+            d_rew = []
+            vals_tp1 = self.value(obs_t)
+
+            # shape data for batching
+            logis = np.asarray(logis, dtype=np.float32).swapaxes(1, 0)
+            obses = np.asarray(obses, dtype=np.float32).swapaxes(1, 0)
+            actions = np.asarray(actions, dtype=np.float32).swapaxes(1, 0)
+            values = np.asarray(values, dtype=np.float32).swapaxes(1, 0)
+            rewards = np.asarray(rewards, dtype=np.float32).swapaxes(1, 0)
+            dones = np.asarray(dones, dtype=np.float32).swapaxes(1, 0)
 
             # calculate discounted rewards
-            if dones[-1] == 0:
-                # we append the value for V(o_tp1) to the end of the list
-                # this will the first value for R as in the original pseudocode
-                val = self.value(obs_t)
-                R_j = discount_with_dones(rewards + list(val), dones + [0], self.gamma)[:-1]
-            else:
-                R_j = discount_with_dones(rewards, dones, self.gamma)
+            for (rews, dons, val) in zip(rewards, dones, vals_tp1):
+
+                if dons[-1] == 0:
+                    # we append the value for V(o_tp1) to the end of the list
+                    # this will the first value for R as in the original pseudocode
+                    dr = discount_with_dones(list(rews) + list(val), list(dons) + [0], self.gamma)[:-1]
+                else:
+                    dr = discount_with_dones(rews, dons, self.gamma)
+
+                d_rew.append(dr)
+
+            # shape data for batching
+            logis = np.reshape(logis, (self.batch_size, self.num_actions))
+            obses = np.reshape(obses, (self.batch_size, ) + self.obs_shape)
+            actions = np.reshape(actions, (self.batch_size, 1))
+            values = np.reshape(values, (self.batch_size, 1))
+            d_rew = np.reshape(d_rew, (self.batch_size, 1))
 
             # build feed dict for gradient and/or training operation
-            g_feed = self._gradient_fd(R_js=R_j,
+            g_feed = self._gradient_fd(dis_rew=d_rew,
                                        obses=obses,
                                        logis=logis,
                                        actions=actions,
                                        values=values,
-                                       steps_t=steps_t,
                                        mean_ret=mean_ret)
 
             # run training step using already computed data
             if self.use_tensorboard:
-                _, cur_ent, sum = self.sess.run([self.train_op, self.pi_entropy, self.merge_op], feed_dict=g_feed)
+                _, sum = self.sess.run([self.train_op, self.merge_op], feed_dict=g_feed)
                 self.writer.add_summary(sum, T)
             else:
-                _, cur_ent = self.sess.run([self.train_op, self.pi_entropy], feed_dict=g_feed)
+                self.sess.run(self.train_op, feed_dict=g_feed)
 
         # finalize training, e.g. set flags, write done-file
         self._finalize_training()
