@@ -1,6 +1,7 @@
 import numpy as np
 import os
 
+from forkan import fixed_seed
 from forkan.rl import EnvWrapper
 from multiprocessing import Process, Pipe
 
@@ -13,7 +14,14 @@ def worker(parent, conn, tid, env):
 
     # save PID and change seed based on this
     pid = os.getpid()
-    np.random.seed(pid)
+
+    # thread ID as seed: runs will yield same result for same number of threads
+    # while maintaining different seeds across threads
+    # process ID as seed: IDs change from run to run
+    if fixed_seed:
+        np.random.seed(tid)
+    else:
+        np.random.seed(pid)
 
     try:
         while True:
