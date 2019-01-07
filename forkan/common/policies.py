@@ -39,6 +39,7 @@ def build_policy(input_shape, num_actions, policy_type='mini-mlp', scope='', reu
             with tf.variable_scope('action_values', reuse=reuse):
                 # one linear layer for action values, e.g. logits
                 action_values = tf.contrib.layers.fully_connected(mlp, num_actions, activation_fn=None)
+                action_values = action_values + tf.random_normal(tf.shape(action_values))
 
             with tf.variable_scope('state_values', reuse=reuse):
                 # linear activation with only one neuron representing the state value
