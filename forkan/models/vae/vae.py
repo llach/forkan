@@ -179,7 +179,7 @@ class VAE(object):
 
         # define recontruction loss
         re_loss = binary_crossentropy(K.flatten(self.inputs), K.flatten(self.outputs))
-        re_loss *= self.input_shape[1]**2
+        re_loss *= self.input_shape[1]**2 # dont square, use correct dims
 
         # define kullback leibler divergence
         kl_loss = 1 + self.z_log_var - K.square(self.z_mean) - K.exp(self.z_log_var)

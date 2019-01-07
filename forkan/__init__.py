@@ -11,6 +11,8 @@ config_path = os.path.dirname(os.path.abspath(__file__)) + '/configs/'
 figure_path = os.environ['HOME'] + '/.keras/forkan/figures/'
 log_file = os.environ['HOME'] + '/.keras/forkan/log.txt'
 
+fixed_seed = True
+
 logging_config = dict(
     version=1,
     formatters={
@@ -47,3 +49,9 @@ for d in [weights_path, dataset_path, figure_path]:
 
 # import files and from files that depend on variables defined above after they are defined
 from forkan.common.config_manager import ConfigManager
+
+# set numpy seed
+if fixed_seed:
+    import numpy as np
+    np.random.seed(0)
+    logger.critical("Starting in fixed seed mode!")
