@@ -14,23 +14,23 @@ def solved_callback(rewards):
 
 a2c_conf = {
     'name': 'cart-a2c',
-    'total_timesteps': 5e4,
-    'lr': 1e-2,
-    'gamma': .99,
-    'entropy_coef': 0.1,
-    'v_loss_coef': 0.05,
+    'total_timesteps': 1e5,
+    'lr': 5e-4,
+    'gamma': .95,
+    'entropy_coef': 0.01,
+    'v_loss_coef': 0.2,
     'gradient_clipping': None,
-    'reward_clipping': 1,
+    'reward_clipping': None,
     'use_tensorboard': True,
     'clean_tensorboard_runs': True,
     'clean_previous_weights': True,
-    'print_freq': 10,
+    'print_freq': 20,
     'solved_callback': solved_callback,
 }
 
 env_conf = {
     'eid': 'CartPole-v0',
-    'num_envs': 2,
+    'num_envs': 4,
 }
 
 e = make(**env_conf)

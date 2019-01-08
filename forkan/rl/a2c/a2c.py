@@ -131,9 +131,9 @@ class A2C(BaseAgent):
         self.policy_net_vars = _get_trainable_variables(scope=self.policy_scope)
 
         # setup placeholders for later
-        self.adv_ph = tf.placeholder(tf.float32, (None, 1), name='advantage-values')
-        self.actions_ph = tf.placeholder(tf.int32, (None, 1), name='actions')
-        self.dis_rew_ph = tf.placeholder(tf.float32, (None, 1), name='discounted-reward')
+        self.adv_ph = tf.placeholder(tf.float32, (None, ), name='advantage-values')
+        self.actions_ph = tf.placeholder(tf.int32, (None, ), name='actions')
+        self.dis_rew_ph = tf.placeholder(tf.float32, (None, ), name='discounted-reward')
 
         # construct policy loss
         self.oh_actions = tf.one_hot(self.actions_ph, self.num_actions)
@@ -144,8 +144,8 @@ class A2C(BaseAgent):
         self.policy_loss = self.pi_loss + self.entropy_coef * self.pi_entropy
 
         # construct value loss
-        self.value_loss = tf.reduce_mean(tf.losses.mean_squared_error(labels=self.dis_rew_ph, predictions=self.values))
-
+        self.value_loss = tf.reduce_mean(tf.losses.mean_squared_error(labels=tf.expand_dims(self.dis_rew_ph, -1),
+                                                                      predictions=self.values))
         # final loss
         self.loss = self.policy_loss + self.v_loss_coef * self.value_loss
 
@@ -202,7 +202,7 @@ class A2C(BaseAgent):
         """ Takes multistep-batch and returns feed dict for gradient computation. """
 
         # calculate advantage values
-        advs = (dis_rew - values)
+        advs = (dis_rew - np.squeeze(values))
 
         # we assign values to defined tensors here so we
         # avoid one additional forward pass
@@ -226,11 +226,13 @@ class A2C(BaseAgent):
                     self.obs_ph: obs
                 })[0]
 
+
     def learn(self):
         """ Learns Q function for a given amount of timesteps. """
 
         # reset env, store first observation
         obs_t = self.env.reset()
+        d_t = [False] * self.num_envs
 
         # real timesteps
         T = 0
@@ -244,7 +246,9 @@ class A2C(BaseAgent):
 
         while T < self.total_timesteps:
 
-            obses, logis, actions, rewards, dones, values = [], [], [], [], [], []
+
+            # We initialize the lists that will contain the mb of experiences
+            mb_obs, mb_rewards, mb_actions, mb_values, mb_dones, mb_logi = [], [], [], [], [], []
 
             # perform multisteps
             for n in range(self.tmax):
@@ -254,23 +258,26 @@ class A2C(BaseAgent):
                     self.obs_ph: obs_t
                 })
 
-                # chose action based on highest action
-                acs = np.argmax(logi, axis=1)
-
                 # observe o+1, r+1
-                obs_tp1, r_t, d_t, _ = self.env.step(acs)
+                obs_tp1, r_t, d_tp1, _ = self.env.step(acs)
 
-                # store data
-                logis.append(logi)
-                obses.append(obs_t)
-                actions.append(acs)
-                rewards.append(r_t)
-                dones.append(d_t)
-                values.append(val)
+                # Append the experiences
+                mb_obs.append(np.copy(obs_t))
+                mb_actions.append(acs)
+                mb_logi.append(logi)
+                mb_values.append(val)
+                mb_dones.append(d_t)
+                mb_rewards.append(r_t)
+
+                # TODO WHY
+                for n, done in enumerate(d_t):
+                    if done:
+                        obs_t[n] = obs_t[n] * 0
 
                 # t <-- t + 1
                 T += 1
                 obs_t = obs_tp1
+                d_t = d_tp1
 
                 # we check for each env whether it finised, otherwise store rewards
                 # resets are not needed, they happen in the threads after episode termination
@@ -299,43 +306,47 @@ class A2C(BaseAgent):
 
                             print('\n{}'.format(tabulate(result_table)))
 
-            # init discounted returns array
-            d_rew = []
-            vals_tp1 = self.value(obs_t)
+            # TODO why additional done append?
+            mb_dones.append(d_t)
 
-            # shape data for batching
-            logis = np.asarray(logis, dtype=np.float32).swapaxes(1, 0)
-            obses = np.asarray(obses, dtype=np.float32).swapaxes(1, 0)
-            actions = np.asarray(actions, dtype=np.float32).swapaxes(1, 0)
-            values = np.asarray(values, dtype=np.float32).swapaxes(1, 0)
-            rewards = np.asarray(rewards, dtype=np.float32).swapaxes(1, 0)
-            dones = np.asarray(dones, dtype=np.float32).swapaxes(1, 0)
+            # Batch of steps to batch of rollouts
+            mb_obs = np.asarray(mb_obs, dtype=np.float32).swapaxes(1, 0).reshape((self.batch_size, ) + self.obs_shape)
+            mb_rewards = np.asarray(mb_rewards, dtype=np.float32).swapaxes(1, 0)
+            mb_actions = np.asarray(mb_actions, dtype=np.int32).swapaxes(1, 0)
+            mb_values = np.asarray(mb_values, dtype=np.float32).swapaxes(1, 0)
+            mb_logi = np.asarray(mb_logi, dtype=np.float32).swapaxes(1, 0)
+            mb_dones = np.asarray(mb_dones, dtype=np.bool).swapaxes(1, 0)
+            mb_masks = mb_dones[:, :-1]
+            mb_dones = mb_dones[:, 1:]
 
-            # calculate discounted rewards
-            for (rews, dons, val) in zip(rewards, dones, vals_tp1):
+            if self.gamma > 0.0:
+                # calculate pi & state value
+                _, last_values = self.sess.run([self.logits, self.values], feed_dict={
+                    self.obs_ph: obs_t
+                })
+                for n, (rewards, dones, value) in enumerate(zip(mb_rewards, mb_dones, last_values)):
+                    rewards = rewards.tolist()
+                    dones = dones.tolist()
+                    if dones[-1] == 0:
+                        rewards = discount_with_dones(rewards + [value], dones + [0], self.gamma)[:-1]
+                    else:
+                        rewards = discount_with_dones(rewards, dones, self.gamma)
 
-                if dons[-1] == 0:
-                    # we append the value for V(o_tp1) to the end of the list
-                    # this will the first value for R as in the original pseudocode
-                    dr = discount_with_dones(list(rews) + list(val), list(dons) + [0], self.gamma)[:-1]
-                else:
-                    dr = discount_with_dones(rews, dons, self.gamma)
+                    mb_rewards[n] = rewards
 
-                d_rew.append(dr)
+            mb_actions = mb_actions.reshape((self.batch_size, ))
+            mb_logi = mb_logi.reshape((self.batch_size, self.num_actions))
 
-            # shape data for batching
-            logis = np.reshape(logis, (self.batch_size, self.num_actions))
-            obses = np.reshape(obses, (self.batch_size, ) + self.obs_shape)
-            actions = np.reshape(actions, (self.batch_size, 1))
-            values = np.reshape(values, (self.batch_size, 1))
-            d_rew = np.reshape(d_rew, (self.batch_size, 1))
+            mb_rewards = mb_rewards.flatten()
+            mb_values = np.expand_dims(mb_values.flatten(), -1)
+            mb_masks = mb_masks.flatten()
 
             # build feed dict for gradient and/or training operation
-            g_feed = self._gradient_fd(dis_rew=d_rew,
-                                       obses=obses,
-                                       logis=logis,
-                                       actions=actions,
-                                       values=values,
+            g_feed = self._gradient_fd(dis_rew=mb_rewards,
+                                       obses=mb_obs,
+                                       logis=mb_logi,
+                                       actions=mb_actions,
+                                       values=mb_values,
                                        mean_ret=mean_ret)
 
             # run training step using already computed data
