@@ -120,7 +120,7 @@ class A2C(BaseAgent):
         self.policy_scope = 'policy'
 
         # create value net, action net and policy output (and get input placeholder)
-        self.obs_ph, self.logits, self.values = build_policy(self.obs_shape, self.num_actions, scope=self.policy_scope,
+        self.obs_ph, self.logits, self.values, self.action = build_policy(self.obs_shape, self.num_actions, scope=self.policy_scope,
                                                              policy_type=self.policy_type, reuse=False)
 
         # store list of policy network variables
@@ -250,7 +250,7 @@ class A2C(BaseAgent):
             for n in range(self.tmax):
 
                 # calculate pi & state value
-                logi, val = self.sess.run([self.logits, self.values], feed_dict={
+                logi, val, acs = self.sess.run([self.logits, self.values, self.action], feed_dict={
                     self.obs_ph: obs_t
                 })
 
@@ -293,7 +293,7 @@ class A2C(BaseAgent):
                         if self.print_freq is not None and len(past_returns) % self.print_freq == 0:
                             result_table = [
                                 ['T', T],
-                                ['episode', len(past_returns)],
+                                ['episode', len(past_returns)//self.num_envs],
                                 ['mean return', mean_ret],
                             ]
 
