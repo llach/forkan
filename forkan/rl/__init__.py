@@ -7,6 +7,7 @@ from forkan.rl.base_agent import BaseAgent
 from forkan.rl.env_wrapper import EnvWrapper
 from forkan.rl.repeat_env import RepeatEnv
 from forkan.rl.multi_env import MultiEnv
+from forkan.rl.multi_stepper import MultiStepper
 
 from forkan.rl.dqn.dqn import DQN
 from forkan.rl.a2c.a2c import A2C

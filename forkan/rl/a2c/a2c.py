@@ -1,18 +1,11 @@
 import numpy as np
 import tensorflow as tf
 
-from forkan.rl import BaseAgent
+from forkan.rl import BaseAgent, MultiStepper
 from forkan.common.policies import build_policy
-from forkan.common.utils import discount_with_dones
 from forkan.common.tf_utils import scalar_summary, entropy_from_logits
 
 from tabulate import tabulate
-
-"""
-TODO's
-
-- noise on logits?
-"""
 
 
 class A2C(BaseAgent):
@@ -36,8 +29,7 @@ class A2C(BaseAgent):
                  **kwargs,
                  ):
         """
-        Implementation of the Deep Q Learning (DQN) algorithm formulated by Mnih et. al.
-        Contains some well known improvements over the vanilla DQN.
+        Implementation A2C aka Advantage Actor Critic introduced by Mnih.
 
         Parameters
         ----------
@@ -164,6 +156,9 @@ class A2C(BaseAgent):
         # create training op
         self.train_op = self.opt.apply_gradients(self.gradients)
 
+        # multistepper that collects batches of experience
+        self.multistepper = MultiStepper(self, self.env, self.tmax)
+
         # takes care of tensorboard, debug and checkpoint init
         self._finalize_init()
 
@@ -198,11 +193,11 @@ class A2C(BaseAgent):
         with tf.variable_scope('gradients'):
             for g in self.gradients: tf.summary.histogram('{}-grad'.format(g[1].name), g[0])
 
-    def _gradient_fd(self, dis_rew, obses, logis, actions, values, mean_ret=None):
+    def _gradient_fd(self, discounted_rewards, obses, logis, actions, values, mean_ret=None):
         """ Takes multistep-batch and returns feed dict for gradient computation. """
 
         # calculate advantage values
-        advs = (dis_rew - np.squeeze(values))
+        advs = (discounted_rewards - np.squeeze(values))
 
         # we assign values to defined tensors here so we
         # avoid one additional forward pass
@@ -210,7 +205,7 @@ class A2C(BaseAgent):
             self.adv_ph: advs,
             self.actions_ph: actions,
             self.obs_ph: obses,
-            self.dis_rew_ph: dis_rew,
+            self.dis_rew_ph: discounted_rewards,
             self.logits: logis,
             self.values: values,
         }
@@ -226,19 +221,23 @@ class A2C(BaseAgent):
                     self.obs_ph: obs
                 })[0]
 
+    def step(self, obs):
+        """ Returns logits, values and chosen actions given obs. """
+        return self.sess.run([self.logits, self.values, self.action], feed_dict={
+                self.obs_ph: obs
+            })
 
     def learn(self):
         """ Learns Q function for a given amount of timesteps. """
 
         # reset env, store first observation
-        obs_t = self.env.reset()
-        d_t = [False] * self.num_envs
+        self.multistepper.on_training_start()
 
         # real timesteps
         T = 0
 
         # some statistics
-        cur_eps_rets = np.zeros((self.num_envs,), np.float32)
+        cur_eps_rets = [0]*self.num_envs
         past_returns = []
         mean_ret = 0.0
 
@@ -246,42 +245,16 @@ class A2C(BaseAgent):
 
         while T < self.total_timesteps:
 
+            # collect batch of experiences
+            batch_obs, batch_actions, batch_rewards, batch_dones, \
+            batch_logits, batch_values, raw_rewards = self.multistepper.step()
 
-            # We initialize the lists that will contain the mb of experiences
-            mb_obs, mb_rewards, mb_actions, mb_values, mb_dones, mb_logi = [], [], [], [], [], []
+            T += self.tmax
 
-            # perform multisteps
-            for n in range(self.tmax):
-
-                # calculate pi & state value
-                logi, val, acs = self.sess.run([self.logits, self.values, self.action], feed_dict={
-                    self.obs_ph: obs_t
-                })
-
-                # observe o+1, r+1
-                obs_tp1, r_t, d_tp1, _ = self.env.step(acs)
-
-                # Append the experiences
-                mb_obs.append(np.copy(obs_t))
-                mb_actions.append(acs)
-                mb_logi.append(logi)
-                mb_values.append(val)
-                mb_dones.append(d_t)
-                mb_rewards.append(r_t)
-
-                # TODO WHY
-                for n, done in enumerate(d_t):
-                    if done:
-                        obs_t[n] = obs_t[n] * 0
-
-                # t <-- t + 1
-                T += 1
-                obs_t = obs_tp1
-                d_t = d_tp1
-
-                # we check for each env whether it finised, otherwise store rewards
-                # resets are not needed, they happen in the threads after episode termination
-                for n, (re, do) in enumerate(zip(r_t, d_t)):
+            # we check for each env whether it finised, otherwise store rewards
+            # resets are not needed, they happen in the threads after episode termination
+            for n, (r_t, d_t) in enumerate(zip(raw_rewards, batch_dones)):
+                for (re, do) in zip(r_t, d_t):
 
                     # accumulate reward for this step
                     cur_eps_rets[n] += re
@@ -300,53 +273,18 @@ class A2C(BaseAgent):
                         if self.print_freq is not None and len(past_returns) % self.print_freq == 0:
                             result_table = [
                                 ['T', T],
-                                ['episode', len(past_returns)//self.num_envs],
+                                ['episode', len(past_returns)],
                                 ['mean return', mean_ret],
                             ]
 
                             print('\n{}'.format(tabulate(result_table)))
 
-            # TODO why additional done append?
-            mb_dones.append(d_t)
-
-            # Batch of steps to batch of rollouts
-            mb_obs = np.asarray(mb_obs, dtype=np.float32).swapaxes(1, 0).reshape((self.batch_size, ) + self.obs_shape)
-            mb_rewards = np.asarray(mb_rewards, dtype=np.float32).swapaxes(1, 0)
-            mb_actions = np.asarray(mb_actions, dtype=np.int32).swapaxes(1, 0)
-            mb_values = np.asarray(mb_values, dtype=np.float32).swapaxes(1, 0)
-            mb_logi = np.asarray(mb_logi, dtype=np.float32).swapaxes(1, 0)
-            mb_dones = np.asarray(mb_dones, dtype=np.bool).swapaxes(1, 0)
-            mb_masks = mb_dones[:, :-1]
-            mb_dones = mb_dones[:, 1:]
-
-            if self.gamma > 0.0:
-                # calculate pi & state value
-                _, last_values = self.sess.run([self.logits, self.values], feed_dict={
-                    self.obs_ph: obs_t
-                })
-                for n, (rewards, dones, value) in enumerate(zip(mb_rewards, mb_dones, last_values)):
-                    rewards = rewards.tolist()
-                    dones = dones.tolist()
-                    if dones[-1] == 0:
-                        rewards = discount_with_dones(rewards + [value], dones + [0], self.gamma)[:-1]
-                    else:
-                        rewards = discount_with_dones(rewards, dones, self.gamma)
-
-                    mb_rewards[n] = rewards
-
-            mb_actions = mb_actions.reshape((self.batch_size, ))
-            mb_logi = mb_logi.reshape((self.batch_size, self.num_actions))
-
-            mb_rewards = mb_rewards.flatten()
-            mb_values = np.expand_dims(mb_values.flatten(), -1)
-            mb_masks = mb_masks.flatten()
-
             # build feed dict for gradient and/or training operation
-            g_feed = self._gradient_fd(dis_rew=mb_rewards,
-                                       obses=mb_obs,
-                                       logis=mb_logi,
-                                       actions=mb_actions,
-                                       values=mb_values,
+            g_feed = self._gradient_fd(discounted_rewards=batch_rewards,
+                                       obses=batch_obs,
+                                       logis=batch_logits,
+                                       actions=batch_actions,
+                                       values=batch_values,
                                        mean_ret=mean_ret)
 
             # run training step using already computed data
