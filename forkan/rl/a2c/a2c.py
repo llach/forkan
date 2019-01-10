@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 
-from forkan.rl import BaseAgent, MultiStepper
+from forkan.rl import BaseAgent, MultiStepper, MultiEnv
 from forkan.common.policies import build_policy
 from forkan.common.tf_utils import scalar_summary, entropy_from_logits
 
@@ -101,7 +101,11 @@ class A2C(BaseAgent):
         super().__init__(env, alg_name, name, **kwargs)
 
         # number of environments
-        self.num_envs = env.num_envs
+        if isinstance(env, MultiEnv):
+            self.num_envs = env.num_envs
+        else:
+            self.num_envs = 1
+
         self.batch_size = self.num_envs * self.tmax
 
         # env specific parameter
@@ -240,6 +244,7 @@ class A2C(BaseAgent):
         cur_eps_rets = [0]*self.num_envs
         past_returns = []
         mean_ret = 0.0
+        best_mean_ret = 0.0
 
         self.logger.info('Starting training!')
 
@@ -266,9 +271,13 @@ class A2C(BaseAgent):
                         # zero reward
                         cur_eps_rets[n] *= 0
 
-                        # calculate mean returns
+                        # calculate mean returns and save model weights
                         if len(past_returns) > 20:
                             mean_ret = np.mean(past_returns[-20:])
+                            if mean_ret > best_mean_ret:
+                                best_mean_ret = mean_ret
+                                self.logger.info('Storing weights with score {}'.format(best_mean_ret))
+                                self._save('best')
 
                         if self.print_freq is not None and len(past_returns) % self.print_freq == 0:
                             result_table = [
@@ -300,4 +309,25 @@ class A2C(BaseAgent):
     def run(self, render=True):
         """ Runs policy on given environment """
 
-        pass
+        if not self.is_trained:
+            self.logger.warning('Trying to run untrained model!')
+
+        # set necessary parameters to their defaults
+        reward = 0.0
+        obs = self.env.reset()
+
+        while True:
+
+            _, _, action = self.step([obs])
+
+            # act on environment with chosen action
+            obs, rew, done, _ = self.env.step(action[0])
+            reward += rew
+
+            if render:
+                self.env.render()
+
+            if done:
+                self.logger.info('Done! Reward {}'.format(reward))
+                reward = 0.0
+                obs = self.env.reset()
