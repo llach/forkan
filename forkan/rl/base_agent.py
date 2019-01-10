@@ -136,7 +136,15 @@ class BaseAgent(object):
         if self.use_checkpoints:
 
             # remove old weights if needed and not already trained until the end
-            if self.clean_previous_weights and not os.path.isfile('{}/done'.format(self.checkpoint_dir)):
+            if self.clean_previous_weights:
+                self.logger.info('Cleaning weights ...')
+
+                if os.path.isfile('{}/done'.format(self.checkpoint_dir)):
+                    self.logger.critical('Successfully trained weights shall be deleted under \n\n'
+                                         '{}/done\n\n'
+                                         'This is most likely a misconfiguration. Either delete the done-file'
+                                         'or the weihts themselves manually.')
+
                 clean_dir(self.checkpoint_dir)
 
             # be sure that the directory exits
@@ -171,8 +179,9 @@ class BaseAgent(object):
 
     def _save(self, weight_dir='latest'):
         """ Saves current weights under CHECKPOINT_DIR/weight_dir/ """
-
-        self.saver.save(self.sess, '{}/{}/'.format(self.checkpoint_dir, weight_dir))
+        wdir = '{}/{}/'.format(self.checkpoint_dir, weight_dir)
+        self.logger.info('Saving weights to {}'.format(wdir))
+        self.saver.save(self.sess, wdir)
 
     def _load(self):
         """
@@ -181,8 +190,11 @@ class BaseAgent(object):
 
         """
         # check whether the model being loaded was fully trained
-        if os.path.isfile('{}/done'.format(self.checkpoint_dir)) and os.path.isdir('{}/best/'.format(self.checkpoint_dir)):
-            self.logger.debug('Loading finished weights from {}'.format(self.checkpoint_dir))
+        if os.path.isdir('{}/best/'.format(self.checkpoint_dir)):
+            if os.path.isfile('{}/done'.format(self.checkpoint_dir)):
+                self.logger.debug('Loading finished weights from {}'.format(self.checkpoint_dir))
+            else:
+                self.logger.debug('Loading best weights from {}'.format(self.checkpoint_dir))
             self.saver.restore(self.sess, '{}/best/'.format(self.checkpoint_dir))
 
             # set model as trained
