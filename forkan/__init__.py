@@ -7,7 +7,6 @@ from forkan.common.utils import create_dir
 
 weights_path = os.environ['HOME'] + '/.keras/forkan/weights/'
 dataset_path = os.environ['HOME'] + '/.keras/datasets/'
-config_path = os.path.dirname(os.path.abspath(__file__)) + '/configs/'
 figure_path = os.environ['HOME'] + '/.keras/forkan/figures/'
 log_file = os.environ['HOME'] + '/.keras/forkan/log.txt'
 
@@ -46,9 +45,6 @@ coloredlogs.install(level='DEBUG', fmt=fmt, datefmt=datefmt)
 
 for d in [weights_path, dataset_path, figure_path]:
     create_dir(d)
-
-# import files and from files that depend on variables defined above after they are defined
-from forkan.common.config_manager import ConfigManager
 
 # set numpy seed
 if fixed_seed:

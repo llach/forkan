@@ -520,11 +520,3 @@ class DQN(BaseAgent):
                 self.logger.info('Done! Reward {}'.format(reward))
                 reward = 0.0
                 obs = self.env.reset()
-
-
-if __name__ == '__main__':
-    from forkan import ConfigManager
-
-    cm = ConfigManager(['cart-dqn'])
-    cm.exec()
-
