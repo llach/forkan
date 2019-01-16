@@ -232,7 +232,7 @@ class A2C(BaseAgent):
             })
 
     def learn(self):
-        """ Learns Q function for a given amount of timesteps. """
+        """ Trains Actor and Critic for a given amount of timesteps. """
 
         # reset env, store first observation
         self.multistepper.on_training_start()
