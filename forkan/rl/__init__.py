@@ -10,6 +10,7 @@ from forkan.rl.multi_stepper import MultiStepper
 
 from forkan.rl.dqn.dqn import DQN
 from forkan.rl.a2c.a2c import A2C
+from forkan.rl.trpo.trpo import TRPO
 
 
 logger = logging.getLogger(__name__)

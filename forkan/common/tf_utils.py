@@ -1,5 +1,5 @@
+import numpy as np
 import tensorflow as tf
-
 
 def entropy_from_logits(logits):
     """
@@ -25,6 +25,45 @@ def entropy_from_logits(logits):
 
     # entropy calculation with reversion of the max subtraction trick
     return tf.reduce_sum(p0 * (tf.log(z0) - a0), axis=-1)
+
+
+def value_by_index(vec, idx_vec, num_idxes):
+    """
+    Returns vector with values from vec at index given in idx_vec.
+    """
+    return tf.reduce_sum(vec * tf.one_hot(idx_vec, num_idxes), axis=1)
+
+
+def categorical_kl(logp, logq):
+    """
+    Calculates mean KL-divergence of batch of pds
+    """
+    return tf.reduce_mean(tf.reduce_sum(tf.exp(logq) * (logq - logp), axis=1))
+
+
+def flat_concat(xs):
+    """ From SpinningUp: Merges list of tensors into one (X,) tensor. """
+    return tf.concat([tf.reshape(x, (-1,)) for x in xs], axis=0)
+
+
+def flat_grad(f, params):
+    """ From SpinningUp: Convenience function calling flat_concat on gradients. """
+    return flat_concat(tf.gradients(xs=params, ys=f))
+
+
+def assign_params_from_flat(x, params):
+    """ From SpinningUp. """
+    flat_size = lambda p : int(np.prod(p.shape.as_list())) # the 'int' is important for scalars
+    splits = tf.split(x, [flat_size(p) for p in params])
+    new_params = [tf.reshape(p_new, p.shape) for p, p_new in zip(params, splits)]
+    return tf.group([tf.assign(p, p_new) for p, p_new in zip(params, new_params)])
+
+
+def get_trainable_variables(scope=''):
+    """
+    Returns all trainable variables from tf scope.
+    """
+    return tf.trainable_variables(scope=scope)
 
 
 def vector_summary(name, var, scope='vectors', with_hist=False):

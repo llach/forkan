@@ -51,3 +51,6 @@ if fixed_seed:
     import numpy as np
     np.random.seed(0)
     logger.critical("Starting in fixed seed mode!")
+
+# constants
+EPS = 1e-8

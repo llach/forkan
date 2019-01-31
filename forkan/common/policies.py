@@ -45,13 +45,38 @@ def build_policy(input_shape, num_actions, policy_type='mini-mlp', scope='', reu
                 state_value = tf.contrib.layers.fully_connected(mlp, 1, activation_fn=None)
 
             with tf.variable_scope('action', reuse=reuse):
-                # argmax with noise
+                # sample from categorical distribution
                 u = tf.random_uniform(tf.shape(logits), dtype=logits.dtype)
                 action = tf.argmax(logits - tf.log(-tf.log(u)), axis=-1)
 
+            return input_, logits, state_value, action
+
+        if policy_type == 'pi-and-value':
+
+            # squeeze away observation dimensions of 1
+            if 1 in input_shape:
+                squeeze_dims = []
+                for i in range(len(input_shape)):
+                    if input_shape[i] == 1:
+                        squeeze_dims.append(i)
+                input_ = tf.squeeze(input_, squeeze_dims)
+
+            # mlp base for policy
+            with tf.variable_scope('policy'):
+                pi_mlp = _fc(input_, [256, 256])
+                logits = tf.contrib.layers.fully_connected(pi_mlp, num_actions, activation_fn=None)
+
+                # sample from categorical distribution
+                u = tf.random_uniform(tf.shape(logits), dtype=logits.dtype)
+                action = tf.argmax(logits - tf.log(-tf.log(u)), axis=-1)
+
+            with tf.variable_scope('value-function'):
+                v_mlp = _fc(input_, [256, 256])
+                state_value = tf.contrib.layers.fully_connected(v_mlp, 1, activation_fn=None)
+
+            return input_, logits, state_value, action
 
         else:
             logger.critical('Policy type {} unknown!'.format(policy_type))
             sys.exit(0)
 
-    return input_, logits, state_value, action
