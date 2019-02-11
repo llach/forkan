@@ -1,7 +1,7 @@
 import numpy as np
 
 from collections import deque
-from gym.core import Space
+from gym import Space
 
 
 class RepeatEnv(object):
