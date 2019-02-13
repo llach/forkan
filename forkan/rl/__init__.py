@@ -29,8 +29,7 @@ def make(**kwargs):
 
         # wrap env if constructor arguments are found in kwargs
         for env in [AtariPrep]:
-            if any(kwargs.keys()) == any(get_filtered_args(env)):
-
+            if any(map(lambda x: x in kwargs.keys(), get_filtered_args(env))):
                 e = env(e, **kwargs)
 
         return e
