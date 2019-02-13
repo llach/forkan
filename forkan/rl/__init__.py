@@ -1,33 +1,36 @@
 import gym
+import inspect
 import logging
 
-from forkan.rl.base_agent import BaseAgent
-
 from forkan.rl.env_wrapper import EnvWrapper
-from forkan.rl.repeat_env import RepeatEnv
-from forkan.rl.multi_env import MultiEnv
-from forkan.rl.multi_stepper import MultiStepper
-
-from forkan.rl.dqn.dqn import DQN
-from forkan.rl.a2c.a2c import A2C
-from forkan.rl.trpo.trpo import TRPO
-
+from forkan.rl.envs import AtariPrep, MultiEnv
 
 logger = logging.getLogger(__name__)
 
 
-def make(eid,
-         num_envs=None
-         ):
+def make(**kwargs):
     """ Makes gym env and wraps it in EnvWrapper """
 
+    # returns constructor args while ignoring certain names
+    get_filtered_args = lambda y: list(
+        filter(lambda x: x not in ['self', 'env'], inspect.getfullargspec(y.__init__).args))
+
     def maker():
-        e = gym.make(eid)
+        # filter kwargs for gym args
+        gym_args = {k: v for (k, v) in kwargs.items() if k in ['id', 'frameskip', 'game', 'obs_type']}
+
+        e = gym.make(**gym_args)
+
+        # wrap env if constructor arguments are found in kwargs
+        for env in [AtariPrep]:
+            if any(kwargs.keys()) == any(get_filtered_args(env)):
+
+                e = env(e, **kwargs)
+
         return e
 
     # either we thread the env or return the constructed environment
-    if num_envs is not None:
-        return MultiEnv(num_envs, maker)
+    if 'num_envs' in kwargs:
+        return MultiEnv(kwargs['num_envs'], maker)
     else:
         return maker()
-
