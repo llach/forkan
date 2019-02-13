@@ -5,10 +5,10 @@ import coloredlogs
 from logging.config import dictConfig
 from forkan.common.utils import create_dir
 
-weights_path = os.environ['HOME'] + '/.keras/forkan/weights/'
-dataset_path = os.environ['HOME'] + '/.keras/datasets/'
-figure_path = os.environ['HOME'] + '/.keras/forkan/figures/'
-log_file = os.environ['HOME'] + '/.keras/forkan/log.txt'
+weights_path = os.environ['HOME'] + '/.forkan/weights/'
+dataset_path = os.environ['HOME'] + '/.forkan/datasets/'
+figure_path = os.environ['HOME'] + '/.forkan/figures/'
+log_file = os.environ['HOME'] + '/.forkan/log.txt'
 
 fixed_seed = True
 

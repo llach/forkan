@@ -54,9 +54,9 @@ def download_dsprites(dest):
 def prepare_dsprites(type, repetitions=None):
 
     if type == 'original':
-        dataset_file = os.environ['HOME'] + '/.keras/datasets/dsprites.npz'
+        dataset_file = os.environ['HOME'] + '/.forkan/datasets/dsprites.npz'
         if not os.path.isfile(dataset_file):
-            parent_dir = os.environ['HOME'] + '/.keras/datasets/'
+            parent_dir = os.environ['HOME'] + '/.forkan/datasets/'
             try:
                 os.makedirs(parent_dir)
             except OSError as exc:
@@ -64,15 +64,15 @@ def prepare_dsprites(type, repetitions=None):
                     pass
             download_dsprites(dataset_file)
     elif type == 'translation':
-        dataset_file = os.environ['HOME'] + '/.keras/datasets/dsprites_translation.npz'
+        dataset_file = os.environ['HOME'] + '/.forkan/datasets/dsprites_translation.npz'
         if not os.path.isfile(dataset_file):
             generate_dsprites_translation()
     elif type == 'translation_scale':
-        dataset_file = os.environ['HOME'] + '/.keras/datasets/dsprites_translation_scale.npz'
+        dataset_file = os.environ['HOME'] + '/.forkan/datasets/dsprites_translation_scale.npz'
         if not os.path.isfile(dataset_file):
             generate_dsprites_translation(with_scale=True)
     elif type == 'duo':
-        dataset_file = os.environ['HOME'] + '/.keras/datasets/dsprites_duo.npz'
+        dataset_file = os.environ['HOME'] + '/.forkan/datasets/dsprites_duo.npz'
         if not os.path.isfile(dataset_file):
             generate_dsprites_duo()
 
@@ -176,7 +176,7 @@ def generate_dsprites_duo():
 
     prepare_dsprites(type='original')
 
-    dataset_dest = os.environ['HOME'] + '/.keras/datasets/dsprites_duo.npz'
+    dataset_dest = os.environ['HOME'] + '/.forkan/datasets/dsprites_duo.npz'
 
     # initialize output array
     duo = np.empty((0, image_size, image_size))
@@ -234,9 +234,9 @@ def generate_dsprites_translation(with_scale=False):
     prepare_dsprites(type='original')
 
     if not with_scale:
-        dataset_dest = os.environ['HOME'] + '/.keras/datasets/dsprites_translation.npz'
+        dataset_dest = os.environ['HOME'] + '/.forkan/datasets/dsprites_translation.npz'
     else:
-        dataset_dest = os.environ['HOME'] + '/.keras/datasets/dsprites_translation_scale.npz'
+        dataset_dest = os.environ['HOME'] + '/.forkan/datasets/dsprites_translation_scale.npz'
 
     logger.info('Generating translation dataset ...')
 

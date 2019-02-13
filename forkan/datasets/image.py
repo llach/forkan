@@ -12,7 +12,7 @@ def load_image_dataset(name, target_size=[240, 240, 3], test_set=0.08):
 
     logger.info('Loading {} ...'.format(name))
 
-    prefix = os.environ['HOME'] + '/.keras/datasets/'
+    prefix = os.environ['HOME'] + '/.forkan/datasets/'
     dataset_file = '{}/{}.npz'.format(prefix, name)
 
     # check whether we need to generate dataset archive
@@ -36,7 +36,7 @@ def load_unlabeled_image_dataset(name, test_set=None):
         atari = True
         name = name.replace('atari-', '')
 
-    prefix = os.environ['HOME'] + '/.keras/datasets/'
+    prefix = os.environ['HOME'] + '/.forkan/datasets/'
     dataset_file = '{}/{}.npz'.format(prefix, name)
 
     # check whether we need to generate dataset archive
