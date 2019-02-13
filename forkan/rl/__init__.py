@@ -5,6 +5,12 @@ import logging
 from forkan.rl.env_wrapper import EnvWrapper
 from forkan.rl.envs import AtariPrep, MultiEnv
 
+from forkan.rl.envs.multi_stepper import MultiStepper
+
+from forkan.rl.base_agent import BaseAgent
+from forkan.rl.algos import DQN, A2C, TRPO
+
+
 logger = logging.getLogger(__name__)
 
 
