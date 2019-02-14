@@ -76,6 +76,29 @@ def build_policy(input_shape, num_actions, policy_type='mini-mlp', scope='', reu
 
             return input_, logits, state_value, action
 
+        if policy_type == 'mnih-2013':
+
+            conv1 = tf.contrib.layers.conv2d(input_, num_outputs=16, kernel_size=(8, 8), stride=4,
+                                     activation_fn=tf.nn.relu)
+            conv2 = tf.contrib.layers.conv2d(conv1, num_outputs=32, kernel_size=(4, 4), stride=2,
+                                             activation_fn=tf.nn.relu)
+            flat = tf.layers.flatten(conv2)
+            mlp = _fc(flat, [256])
+
+            # mlp base for policy
+            with tf.variable_scope('policy'):
+
+                logits = tf.contrib.layers.fully_connected(mlp, num_actions, activation_fn=None)
+
+                # sample from categorical distribution
+                u = tf.random_uniform(tf.shape(logits), dtype=logits.dtype)
+                action = tf.argmax(logits - tf.log(-tf.log(u)), axis=-1)
+
+            with tf.variable_scope('value-function'):
+                state_value = tf.contrib.layers.fully_connected(mlp, 1, activation_fn=None)
+
+            return input_, logits, state_value, action
+
         else:
             logger.critical('Policy type {} unknown!'.format(policy_type))
             sys.exit(0)
