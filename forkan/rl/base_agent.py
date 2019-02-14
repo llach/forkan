@@ -143,7 +143,7 @@ class BaseAgent(object):
                     self.logger.critical('Successfully trained weights shall be deleted under \n\n'
                                          '{}/done\n\n'
                                          'This is most likely a misconfiguration. Either delete the done-file'
-                                         'or the weihts themselves manually.')
+                                         'or the weihts themselves manually.'.format(self.checkpoint_dir))
 
                 clean_dir(self.checkpoint_dir)
 
