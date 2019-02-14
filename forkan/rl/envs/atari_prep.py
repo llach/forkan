@@ -15,6 +15,7 @@ class AtariPrep(EnvWrapper):
                  num_frames=4,
                  buffer_last=True,
                  target_shape=None,
+                 crop_ranges=None,
                  **kwargs,
                  ):
         """
@@ -29,6 +30,12 @@ class AtariPrep(EnvWrapper):
 
         buffer_last: bool
             if True, obs will have shape (OBS_SHAPE, BUFFER_SIZE), and (BUFFER_SIZE, OBS_SHAPE) otherwise
+
+        target_shape: tuple
+            image shape after resizing
+
+        crop_ranges: list of two tuples
+            crops axes according to passed tuples
         """
 
         self.logger = logging.getLogger(__name__)
@@ -36,6 +43,8 @@ class AtariPrep(EnvWrapper):
         # inheriting from EnvWrapper and passing it an env makes spaces available.
         super().__init__(env)
 
+        self.cr = crop_ranges
+        self.target_shape = target_shape
         self.num_frames = num_frames
         self.buffer_last = buffer_last
 
@@ -50,8 +59,10 @@ class AtariPrep(EnvWrapper):
 
         self.did = False
 
-        # frames can be resized
+        # frames can be resized or cropped
         self.image_shape = self.observation_space.shape[:-1] if target_shape is None else target_shape
+        self.image_shape = self.image_shape if self.cr is None else (self.cr[0][1]-self.cr[0][0],
+                                                                     self.cr[1][1]-self.cr[1][0])
 
         # analog to channels_first and channels_last
         if self.buffer_last:
@@ -73,12 +84,18 @@ class AtariPrep(EnvWrapper):
     def _transform_obs(self, o):
         """ Transforms given observation o to grayscale. """
 
-        # different sets od weights:
+        # different sets of weights:
         # [0.299, 0.587, 0.114]
         # [0.2125, 0.7154, 0.0721]
         o_trans = np.dot(o[..., :3], [0.299, 0.587, 0.114])
-        if self.image_shape != o_trans.shape:
-            o_trans = resize(o_trans, self.image_shape, anti_aliasing=True, mode='reflect')
+
+        # resize
+        if self.target_shape != o_trans.shape:
+            o_trans = resize(o_trans, self.target_shape, anti_aliasing=True, mode='reflect')
+
+        # crop
+        if self.cr is not None:
+            o_trans = o_trans[self.cr[0][0]:self.cr[0][1], self.cr[1][0]:self.cr[1][1]]
 
         return o_trans
 
