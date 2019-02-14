@@ -247,16 +247,13 @@ class A2C(BaseAgent):
         mean_ret = 0.0
         best_mean_ret = 0.0
 
-        self.logger.info('Starting training!')
-
-        for T in tqdm(np.arange(0, self.total_timesteps+self.tmax, self.tmax)):
+        self.logger.info('Starting training for {} steps!'.format(self.total_timesteps))
+        for T in tqdm(np.arange(0, self.total_timesteps, self.tmax)):
 
 
             # collect batch of experiences
             batch_obs, batch_actions, batch_rewards, batch_dones, \
             batch_logits, batch_values, raw_rewards = self.multistepper.step()
-
-            T += self.tmax
 
             # we check for each env whether it finised, otherwise store rewards
             # resets are not needed, they happen in the threads after episode termination
@@ -304,6 +301,14 @@ class A2C(BaseAgent):
                 self.writer.add_summary(sum, T)
             else:
                 self.sess.run(self.train_op, feed_dict=g_feed)
+
+        result_table = [
+            ['T', T],
+            ['episode', len(past_returns)],
+            ['mean return', mean_ret],
+        ]
+
+        print('\n{}'.format(tabulate(result_table)))
 
         # finalize training, e.g. set flags, write done-file
         self._finalize_training()
