@@ -50,7 +50,16 @@ for d in [weights_path, dataset_path, figure_path]:
 if fixed_seed:
     import numpy as np
     np.random.seed(0)
-    logger.critical("Starting in fixed seed mode!")
+    logger.critical('Starting in fixed seed mode!')
 
 # constants
 EPS = 1e-8
+
+import tensorflow as tf
+
+has_gpu = tf.test.is_gpu_available(cuda_only=True)
+
+if has_gpu:
+    logger.info('Using GPU for training.')
+else:
+    logger.critical('ONLY TRAINING ON CPU!!!')

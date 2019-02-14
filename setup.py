@@ -25,5 +25,6 @@ setup(name='forkan',
                         'coloredlogs>=10.0',
                         'matplotlib>=3.0.0',
                         'keras>=2.2.4',
+                        'tqdm>=4.30.0',
                         'baselines'],
       packages=find_packages())

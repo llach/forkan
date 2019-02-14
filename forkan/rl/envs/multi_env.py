@@ -1,5 +1,6 @@
 import numpy as np
 import os
+import logging
 
 from forkan import fixed_seed
 from forkan.rl import EnvWrapper
@@ -100,6 +101,8 @@ class MultiEnv(EnvWrapper):
 
             self.ps.append(p)
             self.conns.append(parent_conn)
+
+        self.logger.info('Spawned {} environments.'.format(num_envs))
 
     def __del__(self):
         """ Close all pipes, join all processes. """

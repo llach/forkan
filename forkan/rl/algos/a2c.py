@@ -5,6 +5,7 @@ from forkan.rl import BaseAgent, MultiStepper, MultiEnv
 from forkan.common.policies import build_policy
 from forkan.common.tf_utils import scalar_summary, entropy_from_logits
 
+from tqdm import tqdm
 from tabulate import tabulate
 
 
@@ -248,7 +249,8 @@ class A2C(BaseAgent):
 
         self.logger.info('Starting training!')
 
-        while T < self.total_timesteps:
+        for T in tqdm(np.arange(0, self.total_timesteps+self.tmax, self.tmax)):
+
 
             # collect batch of experiences
             batch_obs, batch_actions, batch_rewards, batch_dones, \
