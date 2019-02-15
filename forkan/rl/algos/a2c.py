@@ -255,7 +255,7 @@ class A2C(BaseAgent):
             batch_obs, batch_actions, batch_rewards, batch_dones, \
             batch_logits, batch_values, raw_rewards = self.multistepper.step()
 
-            # we check for each env whether it finised, otherwise store rewards
+            # we check for each env whether it finished, otherwise store rewards
             # resets are not needed, they happen in the threads after episode termination
             for n, (r_t, d_t) in enumerate(zip(raw_rewards, batch_dones)):
                 for (re, do) in zip(r_t, d_t):

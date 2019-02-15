@@ -1,6 +1,6 @@
 import numpy as np
+import math
 import os
-import logging
 
 from forkan import fixed_seed
 from forkan.rl import EnvWrapper
@@ -38,6 +38,7 @@ def worker(parent, conn, tid, env):
                 # we reset immediatly after a done. Be sure to only use discounting
                 # that takes dones into consideration.
                 if done:
+                    print('T{}: resetting env ...'.format(tid))
                     ob = env.reset()
                 conn.send((ob, reward, done, info))
             elif cmd == 'reset':
@@ -62,7 +63,7 @@ def worker(parent, conn, tid, env):
 
 class MultiEnv(EnvWrapper):
 
-    def __init__(self, num_envs, make_env):
+    def __init__(self, num_envs, make_env, n_rows=4):
         """
         Multithreads environments.
 
@@ -74,6 +75,9 @@ class MultiEnv(EnvWrapper):
         make_env: function
             functions that returns configured env
 
+        n_rows: int
+            number of rows of env matrix for rendering
+
         """
 
         # inheriting from EnvWrapper and passing it an env makes spaces available.
@@ -83,6 +87,10 @@ class MultiEnv(EnvWrapper):
         self.conns = []
 
         self.num_envs = num_envs
+        self.n_rows = n_rows
+
+        # we only need it if we want to render
+        self.viewer = None
 
         # create process managing environments
         for i in range(num_envs):
@@ -143,3 +151,45 @@ class MultiEnv(EnvWrapper):
         obs, rs, ds, ins = zip(*results)
 
         return np.stack(obs), np.stack(rs), np.stack(ds), ins
+
+    def render(self, mode=''):
+        """ Renders all environments """
+
+        from gym.envs.classic_control import rendering
+
+        # render envs
+        for p in self.conns:
+            p.send(('render', None))
+
+        # collect stacked observations
+        so = np.asarray([p.recv() for p in self.conns], dtype=np.float32)
+
+        n_cols = math.ceil(so.shape[0] / self.n_rows)
+        h, w = so.shape[1:]
+
+        # concat missing frames for full env matrix
+        missing_frames = self.n_rows - (so.shape[0] % self.n_rows)
+        if missing_frames < 4:
+            blk = np.zeros((missing_frames,) + so.shape[1:])
+            so = np.concatenate([so, blk], axis=0)
+
+        # construct matrix of envs observations
+        env_mat = np.squeeze(so.reshape(n_cols, self.n_rows, h, w, 1).swapaxes(1, 2).reshape(n_cols * h, self.n_rows * w, 1))
+
+        # greyscale -> rgb
+        rgb = []
+        rgb_weights = [1, 1, 1] # not used rn
+
+        for w in rgb_weights:
+            rgb.append(w*env_mat)
+
+        # swap channels
+        rolf = np.moveaxis(np.asarray(rgb, dtype=np.uint8), 0, 2)
+
+        if mode == 'rgb_array':
+            return rolf
+        else:
+            if self.viewer is None:
+                self.viewer = rendering.SimpleImageViewer()
+            self.viewer.imshow(rolf)
+            return self.viewer.isopen

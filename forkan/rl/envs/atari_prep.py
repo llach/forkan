@@ -90,7 +90,7 @@ class AtariPrep(EnvWrapper):
         o_trans = np.dot(o[..., :3], [0.299, 0.587, 0.114])
 
         # resize
-        if self.target_shape != o_trans.shape:
+        if self.target_shape is not None and self.target_shape != o_trans.shape:
             o_trans = resize(o_trans, self.target_shape, anti_aliasing=True, mode='reflect')
 
         # crop
@@ -125,3 +125,12 @@ class AtariPrep(EnvWrapper):
         self.obs_buffer.append(self._transform_obs(self.env.reset()))
 
         return self._transform_buffer()
+
+    def render(self, mode='human'):
+
+        # render normally
+        if mode != 'rgb_array':
+            return self.env.render()
+        else: # return last, transformed frame
+            return self.obs_buffer[-1]
+
