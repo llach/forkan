@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 
+from tqdm import tqdm
 from tabulate import tabulate
 
 from baselines.common.schedules import LinearSchedule
@@ -372,9 +373,9 @@ class DQN(BaseAgent):
         episode_reward_series = [[0.0]]
         episode_rewards = []
 
-        self.logger.info('Starting Exploration')
+        self.logger.info('Starting Exploration, training will start at step {}.'.format(self.training_start))
 
-        for t in range(int(self.total_timesteps)):
+        for t in tqdm(range(int(self.total_timesteps))):
 
             # decide on action either by policy or chose a random one
             epsilon = self.eps.value(t)
