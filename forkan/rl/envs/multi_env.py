@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 import math
 import os
@@ -38,7 +39,6 @@ def worker(parent, conn, tid, env):
                 # we reset immediatly after a done. Be sure to only use discounting
                 # that takes dones into consideration.
                 if done:
-                    print('T{}: resetting env ...'.format(tid))
                     ob = env.reset()
                 conn.send((ob, reward, done, info))
             elif cmd == 'reset':
@@ -88,6 +88,8 @@ class MultiEnv(EnvWrapper):
 
         self.num_envs = num_envs
         self.n_rows = n_rows
+
+        self.logger = logging.getLogger(__name__)
 
         # we only need it if we want to render
         self.viewer = None
