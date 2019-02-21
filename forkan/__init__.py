@@ -5,9 +5,10 @@ import coloredlogs
 from logging.config import dictConfig
 from forkan.common.utils import create_dir
 
-weights_path = os.environ['HOME'] + '/.forkan/weights/'
+model_path = os.environ['HOME'] + '/.forkan/models/'
 dataset_path = os.environ['HOME'] + '/.forkan/datasets/'
 figure_path = os.environ['HOME'] + '/.forkan/figures/'
+tensorboard_path = os.environ['HOME'] + '/.forkan/tensorboard/'
 log_file = os.environ['HOME'] + '/.forkan/log.txt'
 
 fixed_seed = True
@@ -43,7 +44,7 @@ logger = logging.getLogger(__name__)
 
 coloredlogs.install(level='DEBUG', fmt=fmt, datefmt=datefmt)
 
-for d in [weights_path, dataset_path, figure_path]:
+for d in [model_path, dataset_path, figure_path, tensorboard_path]:
     create_dir(d)
 
 # set numpy seed

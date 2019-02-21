@@ -4,14 +4,14 @@ from keras.models import Model
 from keras.layers import Dense, Input, Dropout, GlobalAveragePooling2D
 from keras.callbacks import ModelCheckpoint
 
-from forkan import weights_path
+from forkan import model_path
 from forkan.datasets.image import load_image_dataset
 
 import sys
 import logging
 
 logger = logging.getLogger(__name__)
-model_checkpoint_path = weights_path + '/object_rec/'
+model_checkpoint_path = model_path + '/object_rec/'
 
 MODEL2ABR = {
     'inceptionresnetv2': 'IR2',

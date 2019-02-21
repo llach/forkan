@@ -4,7 +4,7 @@ import tensorflow as tf
 
 from tensorflow.python import debug as tf_debug
 
-from forkan import weights_path
+from forkan import model_path
 from forkan.common.utils import create_dir, rename_latest_run, clean_dir
 
 
@@ -86,7 +86,7 @@ class BaseAgent(object):
         self.clean_previous_weights = clean_previous_weights
 
         # concat name of instance to path -> distinction between saved instances
-        self.checkpoint_dir = '{}/{}/{}/'.format(weights_path, self.alg_name, self.name)
+        self.checkpoint_dir = '{}/{}/{}/'.format(model_path, self.alg_name, self.name)
 
         # logger for different levels
         self.logger = logging.getLogger(self.alg_name)
