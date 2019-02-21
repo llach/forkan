@@ -53,16 +53,19 @@ def download_dsprites(dest):
 
 def prepare_dsprites(type, repetitions=None):
 
+    # check if original set exists
+    dataset_file = os.environ['HOME'] + '/.forkan/datasets/dsprites.npz'
+    if not os.path.isfile(dataset_file):
+        parent_dir = os.environ['HOME'] + '/.forkan/datasets/'
+        try:
+            os.makedirs(parent_dir)
+        except OSError as exc:
+            if exc.errno == errno.EEXIST and os.path.isdir(parent_dir):
+                pass
+        download_dsprites(dataset_file)
+
     if type == 'original':
         dataset_file = os.environ['HOME'] + '/.forkan/datasets/dsprites.npz'
-        if not os.path.isfile(dataset_file):
-            parent_dir = os.environ['HOME'] + '/.forkan/datasets/'
-            try:
-                os.makedirs(parent_dir)
-            except OSError as exc:
-                if exc.errno == errno.EEXIST and os.path.isdir(parent_dir):
-                    pass
-            download_dsprites(dataset_file)
     elif type == 'translation':
         dataset_file = os.environ['HOME'] + '/.forkan/datasets/dsprites_translation.npz'
         if not os.path.isfile(dataset_file):
@@ -75,6 +78,9 @@ def prepare_dsprites(type, repetitions=None):
         dataset_file = os.environ['HOME'] + '/.forkan/datasets/dsprites_duo.npz'
         if not os.path.isfile(dataset_file):
             generate_dsprites_duo()
+    else:
+        logger.error('Unknown dataset {}. Exiting.'.format(type))
+        sys.exit(1)
 
     # try to load dataset
     try:
