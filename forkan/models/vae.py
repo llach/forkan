@@ -8,11 +8,12 @@ from tqdm import tqdm
 from tabulate import tabulate
 
 from forkan.models.vae_networks import build_network
-from forkan.common.tf_utils import scalar_summary, vector_summary
+from forkan.common.tf_utils import scalar_summary
+
 
 class VAE(object):
 
-    def __init__(self, input_shape, network='atari', latent_dim=10, beta=1, lr=5e-4):
+    def __init__(self, input_shape, network='atari', latent_dim=10, beta=1., lr=5e-4):
 
         # take care of correct input dim: (BATCH, HEIGHT, WIDTH, CHANNELS)
         # add channel dim if not provided
@@ -34,7 +35,7 @@ class VAE(object):
         self._input = tf.placeholder(tf.float32, shape=self.input_shape, name='x')
 
         """ TF Graph setup """
-        net = build_network(self._input, self.input_shape, latent_dim=self.latent_dim, network_type=network)
+        net = build_network(self._input, self.input_shape, latent_dim=self.latent_dim, network_type=self.network)
         (self.mus, self.logvars, self.z, self._output) = net
 
         """ Loss """
@@ -59,9 +60,9 @@ class VAE(object):
 
         """ Tensorboard (TB) setup """
 
-        self.fps_ph = tf.placeholder(tf.int32, ())
+        self.bps_ph = tf.placeholder(tf.int32, ())
 
-        scalar_summary('fps', self.fps_ph)
+        scalar_summary('bps', self.bps_ph)
 
         mu_mean = tf.reduce_mean(self.mus, axis=0)
         vars_mean = tf.reduce_mean(tf.exp(0.5 * self.logvars), axis=0)
@@ -168,19 +169,19 @@ class VAE(object):
             np.random.shuffle(dataset)
 
             for n, idx in enumerate(np.arange(0, num_samples, batch_size)):
-                fps = int((t) / (time.time() - tstart))
+                bps = int((t) / (time.time() - tstart))
                 x = dataset[idx:min(idx+batch_size, num_samples), ...]
                 sum, _, loss, kl_loss = self.s.run([self.merge_op, self.train_op, self.total_loss, self.dkl_loss],
-                                                   feed_dict={self._input: x, self.fps_ph: fps})
+                                                   feed_dict={self._input: x, self.bps_ph: bps})
 
-                t += abs(idx-min(idx+batch_size, num_samples))
+                t += 1
                 self.writer.add_summary(sum, t)
 
                 if n % print_freq == 0:
                     tab = tabulate([
                         ['episode', ep],
                         ['batch', n],
-                        ['fps', fps],
+                        ['bps', bps],
                         ['loss', loss],
                         ['dkl_loss', kl_loss]
                     ])
@@ -191,10 +192,7 @@ class VAE(object):
 if __name__ == '__main__':
     from forkan.datasets.dsprites import load_dsprites
     (data, _) = load_dsprites('translation', repetitions=10)
-
-    v = VAE(data.shape[1:], network='dsprites', beta=5.1)
-
-    # data = np.random.underniform(0, 1, [10000, 84, 84])
+    v = VAE(data.shape[1:], network='atari', beta=5.1)
     print(v.train(data, num_episodes=1, print_freq=1))
 
 
