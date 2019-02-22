@@ -28,7 +28,7 @@ class CSVLogger(object):
 
     def writeline(self, *values):
         assert len(values) == len(self.labels), 'trying to set {} entries for {} labels'.format(len(values),
-                                                                                              len(self.labels))
+                                                                                                len(self.labels))
         values = list(values)
         for i, _ in enumerate(values):
             values[i] = str(values[i])
