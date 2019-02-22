@@ -126,8 +126,10 @@ class VAE(object):
         """ Tensorboard (TB) setup """
 
         self.bps_ph = tf.placeholder(tf.int32, ())
+        self.ep_ph = tf.placeholder(tf.int32, ())
 
-        scalar_summary('bps', self.bps_ph)
+        scalar_summary('batches-per-second', self.bps_ph)
+        scalar_summary('episode', self.ep_ph)
 
         mu_mean = tf.reduce_mean(self.mus, axis=0)
         vars_mean = tf.reduce_mean(tf.exp(0.5 * self.logvars), axis=0)
@@ -231,7 +233,8 @@ class VAE(object):
                 x = dataset[idx:min(idx+batch_size, num_samples), ...]
                 sum, _, loss, kl_loss, mean_kl_j = self.s.run([self.merge_op, self.train_op, self.total_loss,
                                                                self.dkl_loss, self.mean_kl_j],
-                                                              feed_dict={self._input: x, self.bps_ph: bps})
+                                                              feed_dict={self._input: x, self.bps_ph: bps,
+                                                                         self.ep_ph: ep})
 
                 # increase batch counter
                 nb += 1
