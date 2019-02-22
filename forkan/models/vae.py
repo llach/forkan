@@ -18,7 +18,11 @@ from forkan.models.vae_networks import build_network
 
 class VAE(object):
 
-    def __init__(self, input_shape, name='default', network='atari', latent_dim=10, beta=1., lr=5e-3, load_from=None):
+    def __init__(self, input_shape=None, name='default', network='atari', latent_dim=20, beta=44.4, lr=5e-3,
+                 load_from=None):
+
+        if input_shape is None:
+            assert load_from is not None, 'input shape need to be given if no model is loaded'
 
         # take care of correct input dim: (BATCH, HEIGHT, WIDTH, CHANNELS)
         # add channel dim if not provided
@@ -34,39 +38,8 @@ class VAE(object):
         self.lr = lr
 
         self.num_channels = self.input_shape[-1]
-
         self.log = logging.getLogger('vae')
 
-        self._input = tf.placeholder(tf.float32, shape=self.input_shape, name='x')
-
-        """ TF Graph setup """
-        self.mus, self.logvars, self.z, self._output = \
-            build_network(self._input, self.input_shape, latent_dim=self.latent_dim, network_type=self.network)
-
-        """ Loss """
-        self.reconstruction_loss = tf.losses.mean_squared_error(self._input, self._output)
-        self.dkl_j = -0.5 * (1 + self.logvars - tf.square(self.mus) - tf.exp(self.logvars))
-        self.mean_kl_j = tf.reduce_mean(self.dkl_j, axis=0)
-        self.dkl_loss = tf.reduce_sum(self.mean_kl_j, axis=0)
-        self.total_loss = self.reconstruction_loss + beta * self.dkl_loss
-
-        # create optimizer
-        self.opt = tf.train.AdamOptimizer(learning_rate=self.lr)
-
-        # specify loss function, only include Q network variables for gradient computation
-        self.gradients = self.opt.compute_gradients(self.total_loss)
-
-        # create training op
-        self.train_op = self.opt.apply_gradients(self.gradients)
-
-        """ TF setup """
-        self.s = tf.Session()
-        tf.global_variables_initializer().run(session=self.s)
-
-        # Saver objects handles writing and reading protobuf weight files
-        self.saver = tf.train.Saver(var_list=tf.all_variables())
-
-        print('\n')
         if load_from is None: # fresh vae
             self.savename = '{}-b{}-lat{}-lr{}-{}'.format(network, beta, latent_dim, lr,
                                                           datetime.datetime.now().strftime('%Y-%m-%dT%H:%M'))
@@ -98,14 +71,43 @@ class VAE(object):
                 self.log.critical('loading {}/params.json failed!'.format(self.savepath))
                 exit(0)
 
+        self._input = tf.placeholder(tf.float32, shape=self.input_shape, name='x')
+
+        """ TF Graph setup """
+        self.mus, self.logvars, self.z, self._output = \
+            build_network(self._input, self.input_shape, latent_dim=self.latent_dim, network_type=self.network)
+        print('\n')
+
+        """ Loss """
+        self.reconstruction_loss = tf.losses.mean_squared_error(self._input, self._output)
+        self.dkl_j = -0.5 * (1 + self.logvars - tf.square(self.mus) - tf.exp(self.logvars))
+        self.mean_kl_j = tf.reduce_mean(self.dkl_j, axis=0)
+        self.dkl_loss = tf.reduce_sum(self.mean_kl_j, axis=0)
+        self.total_loss = self.reconstruction_loss + beta * self.dkl_loss
+
+        # create optimizer
+        self.opt = tf.train.AdamOptimizer(learning_rate=self.lr)
+
+        # compute gradients for loss
+        self.gradients = self.opt.compute_gradients(self.total_loss)
+
+        # create training op
+        self.train_op = self.opt.apply_gradients(self.gradients)
+
+        """ TF setup """
+        self.s = tf.Session()
+        tf.global_variables_initializer().run(session=self.s)
+
+        # Saver objects handles writing and reading protobuf weight files
+        self.saver = tf.train.Saver(var_list=tf.all_variables())
+
         self.log.info('VAE has parameters:')
         print_dict(params, lo=self.log)
 
         self._tensorboard_setup()
         csv_header = ['date', '#episode', '#batch', 'loss', 'kl-loss'] + \
                      ['z{}-kl'.format(i) for i in range(self.latent_dim)]
-        self.csv = CSVLogger('{}/progress.csv'.format(self.savepath), csv_header)
-        exit(1)
+        self.csv = CSVLogger('{}/progress.csv'.format(self.savepath), *csv_header)
 
     def __del__(self):
         """ cleanup after object finalization """
@@ -155,7 +157,7 @@ class VAE(object):
         with tf.variable_scope('gradients'):
             for g in self.gradients:
                 if g[0] is not None:
-                    tf.summary.histogram('{}-grad'.format(g[1].name), g[0])
+                    tf.summary.histogram('{}-grad'.format(g[1].name), g[0]) # todo why is gradient None
 
         self.merge_op = tf.summary.merge_all()
 
@@ -224,14 +226,26 @@ class VAE(object):
             # shuffle dataset
             np.random.shuffle(dataset)
 
-            for n, idx in enumerate(np.arange(0, num_samples, batch_size)):
+            for n, idx in enumerate(tqdm(np.arange(0, num_samples, batch_size))):
                 bps = int(nb / (time.time() - tstart))
                 x = dataset[idx:min(idx+batch_size, num_samples), ...]
-                sum, _, loss, kl_loss = self.s.run([self.merge_op, self.train_op, self.total_loss, self.dkl_loss],
-                                                   feed_dict={self._input: x, self.bps_ph: bps})
+                sum, _, loss, kl_loss, mean_kl_j = self.s.run([self.merge_op, self.train_op, self.total_loss,
+                                                               self.dkl_loss, self.mean_kl_j],
+                                                              feed_dict={self._input: x, self.bps_ph: bps})
 
+                # increase batch counter
                 nb += 1
+
+                # write statistics
                 self.writer.add_summary(sum, nb)
+                self.csv.writeline(
+                    datetime.datetime.now().isoformat(),
+                    ep,
+                    nb,
+                    loss,
+                    kl_loss,
+                    *[z for z in mean_kl_j]
+                )
 
                 if n % print_freq == 0:
                     tab = tabulate([
@@ -250,7 +264,7 @@ class VAE(object):
 if __name__ == '__main__':
     from forkan.datasets.dsprites import load_dsprites
     (data, _) = load_dsprites('translation', repetitions=10)
-    v = VAE(data.shape[1:], network='atari', beta=5.1)
-    print(v.train(data, num_episodes=1, print_freq=1))
+    v = VAE(data.shape[1:], name='test', network='dsprites', beta=30.1, latent_dim=5)
+    v.train(data[:160], num_episodes=5, print_freq=20)
 
 
