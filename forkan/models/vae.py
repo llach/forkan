@@ -83,7 +83,8 @@ class VAE(object):
         self.dkl_j = -0.5 * (1 + self.logvars - tf.square(self.mus) - tf.exp(self.logvars))
         self.mean_kl_j = tf.reduce_mean(self.dkl_j, axis=0)
         self.dkl_loss = tf.reduce_sum(self.mean_kl_j, axis=0)
-        self.total_loss = self.reconstruction_loss + beta * self.dkl_loss
+        self.scaled_kl = beta * self.dkl_loss
+        self.total_loss = self.reconstruction_loss + self.scaled_kl
 
         # create optimizer
         self.opt = tf.train.AdamOptimizer(learning_rate=self.lr)
@@ -135,9 +136,10 @@ class VAE(object):
         vars_mean = tf.reduce_mean(tf.exp(0.5 * self.logvars), axis=0)
 
         with tf.variable_scope('loss'):
+            scalar_summary('scaled_kl', self.scaled_kl)
+            scalar_summary('reconstruction-loss', self.reconstruction_loss)
             scalar_summary('total-loss', self.total_loss)
             scalar_summary('mean-dkl', self.dkl_loss)
-            scalar_summary('reconstruction-loss', self.reconstruction_loss)
 
         with tf.variable_scope('zj_kl'):
             for i in range(self.latent_dim):
