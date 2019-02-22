@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 
 coloredlogs.install(level='DEBUG', fmt=fmt, datefmt=datefmt)
 
-for d in [model_path, dataset_path, figure_path, tensorboard_path]:
+for d in [model_path, dataset_path, figure_path]:
     create_dir(d)
 
 # set numpy seed
