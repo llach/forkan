@@ -156,8 +156,8 @@ class BaseAgent(object):
             # file handle for writing episode summaries
             self.csvlog = open('{}/progress.csv'.format(self.checkpoint_dir), 'a')
 
-            # write headline if file is not empty
-            if not os.stat('{}/progress.csv'.format(self.checkpoint_dir)).st_size == 0:
+            # write headline if file is empty
+            if os.stat('{}/progress.csv'.format(self.checkpoint_dir)).st_size == 0:
                 self.csvlog.write('episode, epsilon, reward\n')
 
             # load already saved weights
