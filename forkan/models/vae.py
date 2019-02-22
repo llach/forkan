@@ -171,16 +171,19 @@ class VAE(object):
     def _preprocess_batch(self, batch):
         """ preprocesses batch """
 
-        """ completing batch shape if some dimesions are missing """
-        # grayscale, one sample
-        if len(batch.shape) == 2:
-            batch = np.expand_dims(np.expand_dims(batch, axis=-1), axis=0)
-        # either  batch of grascale or single multichannel image
-        elif len(batch.shape) == 3:
-            if batch.shape == self.input_shape[1:]:  # single frame
-                batch = np.expand_dims(batch, axis=0)
-            else:  # batch of grayscale
-                batch = np.expand_dims(batch, axis=-1)
+        assert np.max(batch) <= 1, 'normalise input first!'
+
+        if len(batch.shape) != 4:
+            """ completing batch shape if some dimesions are missing """
+            # grayscale, one sample
+            if len(batch.shape) == 2:
+                batch = np.expand_dims(np.expand_dims(batch, axis=-1), axis=0)
+            # either  batch of grascale or single multichannel image
+            elif len(batch.shape) == 3:
+                if batch.shape == self.input_shape[1:]:  # single frame
+                    batch = np.expand_dims(batch, axis=0)
+                else:  # batch of grayscale
+                    batch = np.expand_dims(batch, axis=-1)
 
         assert len(batch.shape) == 4, 'batch shape mismatch'
 
@@ -216,9 +219,8 @@ class VAE(object):
 
         assert np.max(dataset) <= 1, 'provide normalized dataset!'
 
-        # add dimensions if needed
-        if len(dataset.shape) != 4:
-            dataset = self._preprocess_batch(dataset)
+        # some sanity checks
+        dataset = self._preprocess_batch(dataset)
 
         self.log.info('Training on {} samples for {} episodes.'.format(num_samples, num_episodes))
         tstart = time.time()
