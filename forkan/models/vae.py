@@ -89,7 +89,7 @@ class VAE(object):
         # create optimizer
         self.opt = tf.train.AdagradOptimizer(learning_rate=self.lr)
 
-        # compute gradients for loss
+        # compute gradients for loss todo one is None, but model trains.
         self.gradients = self.opt.compute_gradients(self.total_loss)
 
         # create training op
@@ -152,16 +152,6 @@ class VAE(object):
         with tf.variable_scope('zj_var'):
             for i in range(self.latent_dim):
                 scalar_summary('z{}-var'.format(i), vars_mean[i])
-
-        # plot network weights
-        with tf.variable_scope('weights'):
-            for pv in tf.trainable_variables(): tf.summary.histogram('{}'.format(pv.name), pv)
-
-        # gradient histograms
-        with tf.variable_scope('gradients'):
-            for g in self.gradients:
-                if g[0] is not None:
-                    tf.summary.histogram('{}-grad'.format(g[1].name), g[0]) # todo why is gradient None
 
         self.merge_op = tf.summary.merge_all()
 
