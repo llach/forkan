@@ -1,19 +1,24 @@
 import time
+import json
 import numpy as np
 import tensorflow as tf
 
 import logging
+import datetime
 
 from tqdm import tqdm
 from tabulate import tabulate
 
-from forkan.models.vae_networks import build_network
+from forkan import model_path
+from forkan.common import CSVLogger
+from forkan.common.utils import print_dict, create_dir
 from forkan.common.tf_utils import scalar_summary
+from forkan.models.vae_networks import build_network
 
 
 class VAE(object):
 
-    def __init__(self, input_shape, network='atari', latent_dim=10, beta=1., lr=5e-4):
+    def __init__(self, input_shape, name='default', network='atari', latent_dim=10, beta=1., lr=5e-3, load_from=None):
 
         # take care of correct input dim: (BATCH, HEIGHT, WIDTH, CHANNELS)
         # add channel dim if not provided
@@ -30,13 +35,13 @@ class VAE(object):
 
         self.num_channels = self.input_shape[-1]
 
-        self.log = logging.getLogger(__name__)
+        self.log = logging.getLogger('vae')
 
         self._input = tf.placeholder(tf.float32, shape=self.input_shape, name='x')
 
         """ TF Graph setup """
-        net = build_network(self._input, self.input_shape, latent_dim=self.latent_dim, network_type=self.network)
-        (self.mus, self.logvars, self.z, self._output) = net
+        self.mus, self.logvars, self.z, self._output = \
+            build_network(self._input, self.input_shape, latent_dim=self.latent_dim, network_type=self.network)
 
         """ Loss """
         self.reconstruction_loss = tf.losses.mean_squared_error(self._input, self._output)
@@ -58,6 +63,64 @@ class VAE(object):
         self.s = tf.Session()
         tf.global_variables_initializer().run(session=self.s)
 
+        # Saver objects handles writing and reading protobuf weight files
+        self.saver = tf.train.Saver(var_list=tf.all_variables())
+
+        print('\n')
+        if load_from is None: # fresh vae
+            self.savename = '{}-b{}-lat{}-lr{}-{}'.format(network, beta, latent_dim, lr,
+                                                          datetime.datetime.now().strftime('%Y-%m-%dT%H:%M'))
+            self.savepath = '{}/vae-{}/{}/'.format(model_path, name, self.savename)
+            create_dir(self.savepath)
+
+            self.log.info('storing files under {}'.format(self.savepath))
+
+            params = locals()
+            params.pop('self')
+
+            with open('{}/params.json'.format(self.savepath), 'w') as outfile:
+                json.dump(params, outfile)
+        else: # load old parameter
+
+            self.savename = load_from
+            self.savepath = '{}/vae-{}/{}/'.format(model_path, name, self.savename)
+
+            self.log.info('loading model and parameters from {}'.format(self.savepath))
+
+            try:
+                with open('{}/params.json'.format(self.savepath), 'r') as infile:
+                    params = json.load(infile)
+
+                for k, v in params.items():
+                    setattr(self, k, v)
+
+            except:
+                self.log.critical('loading {}/params.json failed!'.format(self.savepath))
+                exit(0)
+
+        self.log.info('VAE has parameters:')
+        print_dict(params, lo=self.log)
+
+        self._tensorboard_setup()
+        csv_header = ['date', '#episode', '#batch', 'loss', 'kl-loss'] + \
+                     ['z{}-kl'.format(i) for i in range(self.latent_dim)]
+        self.csv = CSVLogger('{}/progress.csv'.format(self.savepath), csv_header)
+        exit(1)
+
+    def __del__(self):
+        """ cleanup after object finalization """
+
+        # close tf.Session
+        if hasattr(self, 's'):
+           self.s.close()
+
+    def _save(self, filename='latest'):
+        """ Saves current weights """
+        weights = '{}/{}'.format(self.savepath, filename)
+        self.log.info('saving weights \'{}\''.format(filename))
+        self.saver.save(self.s, weights)
+
+    def _tensorboard_setup(self):
         """ Tensorboard (TB) setup """
 
         self.bps_ph = tf.placeholder(tf.int32, ())
@@ -96,15 +159,8 @@ class VAE(object):
 
         self.merge_op = tf.summary.merge_all()
 
-        self.writer = tf.summary.FileWriter('/tmp/vae',
+        self.writer = tf.summary.FileWriter(self.savepath,
                                             graph=tf.get_default_graph())
-
-    def __del__(self):
-        """ cleanup after object finalization """
-
-        # close tf.Session
-        if hasattr(self, 's'):
-           self.s.close()
             
     def _preprocess_batch(self, batch):
         """ preprocesses batch """
@@ -160,7 +216,7 @@ class VAE(object):
 
         self.log.info('Training on {} samples for {} episodes.'.format(num_samples, num_episodes))
         tstart = time.time()
-        t = 1
+        nb = 1
 
         # rollout N episodes
         for ep in tqdm(range(num_episodes)):
@@ -169,13 +225,13 @@ class VAE(object):
             np.random.shuffle(dataset)
 
             for n, idx in enumerate(np.arange(0, num_samples, batch_size)):
-                bps = int((t) / (time.time() - tstart))
+                bps = int(nb / (time.time() - tstart))
                 x = dataset[idx:min(idx+batch_size, num_samples), ...]
                 sum, _, loss, kl_loss = self.s.run([self.merge_op, self.train_op, self.total_loss, self.dkl_loss],
                                                    feed_dict={self._input: x, self.bps_ph: bps})
 
-                t += 1
-                self.writer.add_summary(sum, t)
+                nb += 1
+                self.writer.add_summary(sum, nb)
 
                 if n % print_freq == 0:
                     tab = tabulate([
@@ -187,6 +243,8 @@ class VAE(object):
                     ])
 
                     print('\n{}'.format(tab))
+
+            self._save()
 
 
 if __name__ == '__main__':
