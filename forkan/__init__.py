@@ -8,7 +8,6 @@ from forkan.common.utils import create_dir
 model_path = os.environ['HOME'] + '/.forkan/models/'
 dataset_path = os.environ['HOME'] + '/.forkan/datasets/'
 figure_path = os.environ['HOME'] + '/.forkan/figures/'
-tensorboard_path = os.environ['HOME'] + '/.forkan/tensorboard/'
 log_file = os.environ['HOME'] + '/.forkan/log.txt'
 
 fixed_seed = True
