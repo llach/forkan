@@ -15,6 +15,14 @@ from keras.utils import to_categorical
 logger = logging.getLogger()
 
 
+def print_dict(d, lo=None):
+    lo = logger if lo is None else lo
+    lo.info('{')
+    for k, v in d.items():
+        lo.info('     {}: {}'.format(k, v))
+    lo.info('}')
+
+
 def discount_with_dones(rewards, dones, gamma):
     """
     Calculates discounted rewards. This is still valid if the episode
