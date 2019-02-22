@@ -18,7 +18,7 @@ from forkan.models.vae_networks import build_network
 
 class VAE(object):
 
-    def __init__(self, input_shape=None, name='default', network='atari', latent_dim=20, beta=44.4, lr=5e-3,
+    def __init__(self, input_shape=None, name='default', network='atari', latent_dim=20, beta=5.5, lr=1e-4,
                  load_from=None):
 
         if input_shape is None:
@@ -87,7 +87,7 @@ class VAE(object):
         self.total_loss = self.reconstruction_loss + self.scaled_kl
 
         # create optimizer
-        self.opt = tf.train.AdamOptimizer(learning_rate=self.lr)
+        self.opt = tf.train.AdagradOptimizer(learning_rate=self.lr)
 
         # compute gradients for loss
         self.gradients = self.opt.compute_gradients(self.total_loss)
