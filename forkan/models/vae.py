@@ -249,6 +249,7 @@ class VAE(object):
 
                 if n % print_freq == 0:
                     tab = tabulate([
+                        ['name', self.name],
                         ['episode', ep],
                         ['batch', n],
                         ['bps', bps],
