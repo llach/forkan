@@ -35,15 +35,16 @@ class VAE(object):
         self.latent_dim = latent_dim
         self.network = network
         self.beta = beta
+        self.name = name
         self.lr = lr
 
         self.num_channels = self.input_shape[-1]
         self.log = logging.getLogger('vae')
 
         if load_from is None: # fresh vae
-            self.savename = '{}-b{}-lat{}-lr{}-{}'.format(network, beta, latent_dim, lr,
+            self.savename = '{}-b{}-lat{}-lr{}-{}'.format(name, beta, latent_dim, lr,
                                                           datetime.datetime.now().strftime('%Y-%m-%dT%H:%M'))
-            self.savepath = '{}/vae-{}/{}/'.format(model_path, name, self.savename)
+            self.savepath = '{}/vae-{}/{}/'.format(model_path, network, self.savename)
             create_dir(self.savepath)
 
             self.log.info('storing files under {}'.format(self.savepath))
@@ -71,7 +72,8 @@ class VAE(object):
                 self.log.critical('loading {}/params.json failed!'.format(self.savepath))
                 exit(0)
 
-        self._input = tf.placeholder(tf.float32, shape=self.input_shape, name='x')
+        with tf.variable_scope('{}-ph'.format(self.name)):
+            self._input = tf.placeholder(tf.float32, shape=self.input_shape, name='input')
 
         """ TF Graph setup """
         self.mus, self.logvars, self.z, self._output = \
@@ -126,8 +128,9 @@ class VAE(object):
     def _tensorboard_setup(self):
         """ Tensorboard (TB) setup """
 
-        self.bps_ph = tf.placeholder(tf.int32, ())
-        self.ep_ph = tf.placeholder(tf.int32, ())
+        with tf.variable_scope('{}-ph'.format(self.name)):
+            self.bps_ph = tf.placeholder(tf.int32, (), name='batches-per-second')
+            self.ep_ph = tf.placeholder(tf.int32, (), name='episode')
 
         scalar_summary('batches-per-second', self.bps_ph)
         scalar_summary('episode', self.ep_ph)
