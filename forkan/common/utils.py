@@ -15,6 +15,48 @@ from keras.utils import to_categorical
 logger = logging.getLogger()
 
 
+class textmod:
+    PURPLE = '\033[95m'
+    CYAN = '\033[96m'
+    DARKCYAN = '\033[36m'
+    BLUE = '\033[94m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    RED = '\033[91m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+    END = '\033[0m'
+
+
+def textbf(text):
+    return textmod.BOLD + text + textmod.END
+
+
+def textul(text):
+    return textmod.UNDERLINE + text + textmod.END
+
+
+def textcolor(text, color='green'):
+
+    if color == 'purple':
+        return textmod.PURPLE + text + textmod.END
+    elif color == 'cyan':
+        return textmod.CYAN + text + textmod.END
+    elif color == 'darkcyan':
+        return textmod.DARKCYAN + text + textmod.END
+    elif color == 'blue':
+        return textmod.BLUE + text + textmod.END
+    elif color == 'green':
+        return textmod.GREEN + text + textmod.END
+    elif color == 'yellow':
+        return textmod.YELLOW + text + textmod.END
+    elif color == 'red':
+        return textmod.RED + text + textmod.END
+    else:
+        logger.warning('color {} no known. not modifying.'.format(color))
+        return text
+
+
 def print_dict(d, lo=None):
     lo = logger if lo is None else lo
     lo.info('{')
