@@ -1,9 +1,10 @@
 import os
+import time
 import logging
 import coloredlogs
 
 from logging.config import dictConfig
-from forkan.common.utils import create_dir
+from forkan.common.utils import create_dir, textbf, textcolor
 
 model_path = os.environ['HOME'] + '/.forkan/models/'
 dataset_path = os.environ['HOME'] + '/.forkan/datasets/'
@@ -60,6 +61,7 @@ import tensorflow as tf
 has_gpu = tf.test.is_gpu_available(cuda_only=True)
 
 if has_gpu:
-    logger.info('Using GPU for training.')
+    logger.info(textbf(textcolor('Using GPU for training.', color='green')))
 else:
-    logger.critical('ONLY TRAINING ON CPU!!!')
+    logger.critical('ONLY TRAINING ON CPU!!! sleeping for two seconds')
+    time.sleep(2)
