@@ -1,5 +1,6 @@
 import os
 import time
+import socket
 import logging
 import coloredlogs
 
@@ -59,9 +60,13 @@ EPS = 1e-8
 import tensorflow as tf
 
 has_gpu = tf.test.is_gpu_available(cuda_only=True)
+hostname = socket.gethostname()
 
 if has_gpu:
     logger.info(textbf(textcolor('Using GPU for training.', color='green')))
 else:
-    logger.critical('ONLY TRAINING ON CPU!!! sleeping for two seconds')
-    time.sleep(2)
+    if hostname == 'llach-macos':
+        logger.critical('ONLY TRAINING ON CPU!!!')
+    else:
+        logger.critical('ONLY TRAINING ON CPU!!! sleeping for two seconds')
+        time.sleep(2)
