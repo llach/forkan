@@ -1,6 +1,7 @@
 import os
 import math
 import errno
+import shutil
 import numpy as np
 import functools
 import inspect
@@ -146,7 +147,7 @@ def ls_dir(d):
     return [d for d in [os.path.join(d, f) for f in os.listdir(d)] if os.path.isdir(d)]
 
 
-def clean_dir(path):
+def clean_dir(path, with_files=False):
     """ Deletes subdirs of path """
 
     logger.debug('Cleaning dir {}'.format(path))
@@ -157,6 +158,19 @@ def clean_dir(path):
 
     for di in ls_dir(path):
         rmtree(di)
+
+    if with_files:
+        for fi in os.listdir(path): os.remove('{}/{}'.format(path, fi))
+
+
+def copytree(src, dst, symlinks=False, ignore=None):
+    for item in os.listdir(src):
+        s = os.path.join(src, item)
+        d = os.path.join(dst, item)
+        if os.path.isdir(s):
+            shutil.copytree(s, d, symlinks, ignore)
+        else:
+            shutil.copy2(s, d)
 
 
 def rename_latest_run(path):
