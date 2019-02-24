@@ -19,32 +19,31 @@ from forkan.models.vae_networks import build_network
 class VAE(object):
 
     def __init__(self, input_shape=None, name='default', network='atari', latent_dim=20, beta=5.5, lr=1e-4,
-                 load_from=None):
+                 load_from=None, sess=None):
 
         if input_shape is None:
             assert load_from is not None, 'input shape need to be given if no model is loaded'
 
-        # take care of correct input dim: (BATCH, HEIGHT, WIDTH, CHANNELS)
-        # add channel dim if not provided
-        if len(input_shape) == 2:
-            input_shape = input_shape + (1,)
-
-        # add batch dim
-        self.input_shape = (None,) + input_shape
-
-        self.latent_dim = latent_dim
-        self.network = network
-        self.beta = beta
-        self.name = name
-        self.lr = lr
-
-        self.num_channels = self.input_shape[-1]
         self.log = logging.getLogger('vae')
 
         if load_from is None: # fresh vae
+            # take care of correct input dim: (BATCH, HEIGHT, WIDTH, CHANNELS)
+            # add channel dim if not provided
+            if len(input_shape) == 2:
+                input_shape = input_shape + (1,)
+
+            self.latent_dim = latent_dim
+            self.network = network
+            self.beta = beta
+            self.name = name
+            self.lr = lr
+
+            # add batch dim
+            self.input_shape = (None,) + input_shape
+
             self.savename = '{}-b{}-lat{}-lr{}-{}'.format(name, beta, latent_dim, lr,
                                                           datetime.datetime.now().strftime('%Y-%m-%dT%H:%M'))
-            self.savepath = '{}/vae-{}/{}/'.format(model_path, network, self.savename)
+            self.savepath = '{}vae-{}/{}/'.format(model_path, network, self.savename)
             create_dir(self.savepath)
 
             self.log.info('storing files under {}'.format(self.savepath))
@@ -57,7 +56,7 @@ class VAE(object):
         else: # load old parameter
 
             self.savename = load_from
-            self.savepath = '{}/vae-{}/{}/'.format(model_path, name, self.savename)
+            self.savepath = '{}vae-{}/{}/'.format(model_path, network, self.savename)
 
             self.log.info('loading model and parameters from {}'.format(self.savepath))
 
@@ -68,9 +67,14 @@ class VAE(object):
                 for k, v in params.items():
                     setattr(self, k, v)
 
-            except:
-                self.log.critical('loading {}/params.json failed!'.format(self.savepath))
+                # add batch dim
+                self.input_shape = (None,) + tuple(self.input_shape)
+            except Exception as e:
+                self.log.critical('loading {}/params.json failed!\n{}'.format(self.savepath, e))
                 exit(0)
+
+        # store number of channels
+        self.num_channels = self.input_shape[-1]
 
         with tf.variable_scope('{}-ph'.format(self.name)):
             self._input = tf.placeholder(tf.float32, shape=self.input_shape, name='input')
@@ -98,11 +102,16 @@ class VAE(object):
         self.train_op = self.opt.apply_gradients(self.gradients)
 
         """ TF setup """
-        self.s = tf.Session()
+        self.s = tf.Session() or sess
         tf.global_variables_initializer().run(session=self.s)
 
         # Saver objects handles writing and reading protobuf weight files
         self.saver = tf.train.Saver(var_list=tf.all_variables())
+
+        if load_from is not None:
+            self.log.info('restoring graph ... ')
+            self.saver.restore(self.s, '{}'.format(self.savepath))
+            self.log.info('done!')
 
         self.log.info('VAE has parameters:')
         print_dict(params, lo=self.log)
@@ -119,11 +128,10 @@ class VAE(object):
         if hasattr(self, 's'):
            self.s.close()
 
-    def _save(self, filename='latest'):
+    def _save(self):
         """ Saves current weights """
-        weights = '{}/{}'.format(self.savepath, filename)
-        self.log.info('saving weights \'{}\''.format(filename))
-        self.saver.save(self.s, weights)
+        self.log.info('saving weights')
+        self.saver.save(self.s, self.savepath)
 
     def _tensorboard_setup(self):
         """ Tensorboard (TB) setup """
