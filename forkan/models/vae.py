@@ -11,7 +11,7 @@ from tabulate import tabulate
 
 from forkan import model_path
 from forkan.common import CSVLogger
-from forkan.common.utils import print_dict, create_dir
+from forkan.common.utils import print_dict, create_dir, clean_dir, copytree
 from forkan.common.tf_utils import scalar_summary
 from forkan.models.vae_networks import build_network
 
@@ -43,6 +43,7 @@ class VAE(object):
 
             self.savename = '{}-b{}-lat{}-lr{}-{}'.format(name, beta, latent_dim, lr,
                                                           datetime.datetime.now().strftime('%Y-%m-%dT%H:%M'))
+            self.parent_dir = '{}vae-{}'.format(model_path, network)
             self.savepath = '{}vae-{}/{}/'.format(model_path, network, self.savename)
             create_dir(self.savepath)
 
@@ -56,6 +57,7 @@ class VAE(object):
         else: # load old parameter
 
             self.savename = load_from
+            self.parent_dir = '{}vae-{}'.format(model_path, network)
             self.savepath = '{}vae-{}/{}/'.format(model_path, network, self.savename)
 
             self.log.info('loading model and parameters from {}'.format(self.savepath))
@@ -270,6 +272,18 @@ class VAE(object):
                     print('\n{}'.format(tab))
 
             self._save()
+
+        newest = '{}/{}/'.format(self.parent_dir, self.name)
+        self.log.info('done training!\ncopying files to {}'.format(newest))
+
+        # create, clean & copy
+        create_dir(newest)
+        clean_dir(newest, with_files=True)
+        copytree(self.savepath, newest)
+
+        # as reference, we leave a file containing the foldername of the just copied model
+        with open('{}from'.format(newest), 'a') as fi:
+            fi.write('{}\n'.format(self.savepath.split('/')[-2]))
 
 
 if __name__ == '__main__':
