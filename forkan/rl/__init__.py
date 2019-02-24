@@ -3,7 +3,7 @@ import inspect
 import logging
 
 from forkan.rl.env_wrapper import EnvWrapper
-from forkan.rl.envs import AtariPrep, MultiEnv
+from forkan.rl.envs import AtariPrep, MultiEnv, LazyVAE
 
 from forkan.rl.envs.multi_stepper import MultiStepper
 
