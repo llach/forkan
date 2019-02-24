@@ -195,14 +195,16 @@ class VAE(object):
 
         batch = self._preprocess_batch(batch)
         self.log.info('encoding batch with shape {}'.format(batch.shape))
-        return self.s.run([self.mus, self.logvars], feed_dict={self._input: batch})
+        # batch as first dim
+        return np.moveaxis(self.s.run([self.mus, self.logvars], feed_dict={self._input: batch}), 1, 0)
 
     def encode_and_sample(self, batch):
         """ encodes frame(s) and samples from dists """
 
         batch = self._preprocess_batch(batch)
         self.log.info('encoding and sampling zs for batch with shape {}'.format(batch.shape))
-        return self.s.run([self.mus, self.logvars, self.z], feed_dict={self._input: batch})
+        # batch as first dim
+        return np.moveaxis(self.s.run([self.mus, self.logvars, self.z], feed_dict={self._input: batch}), 1, 0)
 
     def decode(self, zs):
         """ dcodes batch of latent representations """
