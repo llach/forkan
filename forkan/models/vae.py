@@ -100,7 +100,7 @@ class VAE(object):
         # create optimizer
         self.opt = optimizer(learning_rate=self.lr)
 
-        # compute gradients for loss todo one is None, but model trains.
+        # compute gradients for loss
         self.gradients = self.opt.compute_gradients(self.total_loss)
 
         # create training op

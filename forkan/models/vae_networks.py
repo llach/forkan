@@ -46,7 +46,7 @@ def _build_conv(x, x_shape, rec_shape, latent_dim, network_type,
         fcd = tf.contrib.layers.fully_connected(z, hiddens, activation_fn=tf.nn.relu)
         log.info('fc [ReLu] => {}'.format(fcd.shape))
 
-        fcd2 = tf.contrib.layers.fully_connected(z, int(np.prod(encoder_last_conv_shape[1:])), activation_fn=None)
+        fcd2 = tf.contrib.layers.fully_connected(fcd, int(np.prod(encoder_last_conv_shape[1:])), activation_fn=None)
         log.info('fc [None] => {}'.format(fcd2.shape))
 
         x = tf.reshape(fcd2, shape=rec_shape)
