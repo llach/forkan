@@ -252,8 +252,7 @@ class VAE(object):
                 else:
                     _, loss, kl_loss, mean_kl_j = self.s.run([self.train_op, self.total_loss,
                                                               self.dkl_loss, self.mean_kl_j],
-                                                             feed_dict={self._input: x, self.bps_ph: bps,
-                                                                        self.ep_ph: ep})
+                                                             feed_dict={self._input: x})
 
                 # increase batch counter
                 nb += 1
