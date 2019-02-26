@@ -102,8 +102,8 @@ class VAE(object):
         )
         self.reconstruction_loss = tf.reduce_mean(recon_loss)
 
-        self.zi_kl = -0.5 * tf.reduce_mean(1 + self.logvars - tf.square(self.mus) - tf.exp(self.logvars), axis=0)
-        self.d_kl = tf.reduce_sum(self.zi_kl)
+        self.zi_kl = -0.5 * tf.reduce_sum(1 + self.logvars - tf.square(self.mus) - tf.exp(self.logvars), axis=1)
+        self.d_kl = tf.reduce_mean(self.zi_kl)
 
         self.total_loss = self.reconstruction_loss + self.beta * self.d_kl
         
@@ -269,14 +269,14 @@ class VAE(object):
                 # write statistics
                 if self.tb:
                     self.writer.add_summary(sum, nb)
-                self.csv.writeline(
-                    datetime.datetime.now().isoformat(),
-                    ep,
-                    nb,
-                    loss,
-                    kl_loss,
-                    *[z for z in zi_kl]
-                )
+                # self.csv.writeline(
+                #     datetime.datetime.now().isoformat(),
+                #     ep,
+                #     nb,
+                #     loss,
+                #     kl_loss,
+                #     *[z for z in zi_kl]
+                # )
 
                 if n % print_freq == 0 and print_freq is not -1:
                     tab = tabulate([
