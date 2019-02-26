@@ -19,7 +19,7 @@ from forkan.models.vae_networks import build_network
 class VAE(object):
 
     def __init__(self, input_shape=None, name='default', network='atari', latent_dim=20, beta=5.5, lr=1e-4,
-                 load_from=None, sess=None):
+                 load_from=None, sess=None, optimizer=tf.train.AdamOptimizer):
 
         if input_shape is None:
             assert load_from is not None, 'input shape need to be given if no model is loaded'
@@ -51,6 +51,7 @@ class VAE(object):
 
             params = locals()
             params.pop('self')
+            params.pop('optimizer')
 
             with open('{}/params.json'.format(self.savepath), 'w') as outfile:
                 json.dump(params, outfile)
@@ -95,7 +96,7 @@ class VAE(object):
         self.total_loss = self.reconstruction_loss + self.scaled_kl
 
         # create optimizer
-        self.opt = tf.train.AdagradOptimizer(learning_rate=self.lr)
+        self.opt = optimizer(learning_rate=self.lr)
 
         # compute gradients for loss todo one is None, but model trains.
         self.gradients = self.opt.compute_gradients(self.total_loss)
