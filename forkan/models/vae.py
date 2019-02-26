@@ -19,7 +19,7 @@ from forkan.models.vae_networks import build_network
 class VAE(object):
 
     def __init__(self, input_shape=None, name='default', network='atari', latent_dim=20, beta=5.5, lr=1e-4,
-                 load_from=None, sess=None, optimizer=tf.train.AdamOptimizer):
+                 load_from=None, sess=None, optimizer=tf.train.AdamOptimizer, tensorboard=False):
 
         if input_shape is None:
             assert load_from is not None, 'input shape need to be given if no model is loaded'
@@ -79,6 +79,8 @@ class VAE(object):
         # store number of channels
         self.num_channels = self.input_shape[-1]
 
+        self.tb = tensorboard
+
         with tf.variable_scope('{}-ph'.format(self.name)):
             self._input = tf.placeholder(tf.float32, shape=self.input_shape, name='input')
 
@@ -119,7 +121,8 @@ class VAE(object):
         self.log.info('VAE has parameters:')
         print_dict(params, lo=self.log)
 
-        self._tensorboard_setup()
+        if self.tb:
+            self._tensorboard_setup()
         csv_header = ['date', '#episode', '#batch', 'loss', 'kl-loss'] + \
                      ['z{}-kl'.format(i) for i in range(self.latent_dim)]
         self.csv = CSVLogger('{}/progress.csv'.format(self.savepath), *csv_header)
@@ -241,16 +244,23 @@ class VAE(object):
             for n, idx in enumerate(tqdm(np.arange(0, num_samples, batch_size))):
                 bps = int(nb / (time.time() - tstart))
                 x = dataset[idx:min(idx+batch_size, num_samples), ...]
-                sum, _, loss, kl_loss, mean_kl_j = self.s.run([self.merge_op, self.train_op, self.total_loss,
-                                                               self.dkl_loss, self.mean_kl_j],
-                                                              feed_dict={self._input: x, self.bps_ph: bps,
-                                                                         self.ep_ph: ep})
+                if self.tb:
+                    sum, _, loss, kl_loss, mean_kl_j = self.s.run([self.merge_op, self.train_op, self.total_loss,
+                                                                   self.dkl_loss, self.mean_kl_j],
+                                                                  feed_dict={self._input: x, self.bps_ph: bps,
+                                                                             self.ep_ph: ep})
+                else:
+                    _, loss, kl_loss, mean_kl_j = self.s.run([self.train_op, self.total_loss,
+                                                              self.dkl_loss, self.mean_kl_j],
+                                                             feed_dict={self._input: x, self.bps_ph: bps,
+                                                                        self.ep_ph: ep})
 
                 # increase batch counter
                 nb += 1
 
                 # write statistics
-                self.writer.add_summary(sum, nb)
+                if self.tb:
+                    self.writer.add_summary(sum, nb)
                 self.csv.writeline(
                     datetime.datetime.now().isoformat(),
                     ep,
