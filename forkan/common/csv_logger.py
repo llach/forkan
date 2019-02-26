@@ -17,7 +17,7 @@ class CSVLogger(object):
 
         # write headline if file is empty
         if os.stat('{}'.format(self.path)).st_size == 0:
-            self.fh.write('{}\n'.format(', '.join(self.labels)))
+            self.fh.write('{}\n'.format(','.join(self.labels)))
 
     def __del__(self):
 

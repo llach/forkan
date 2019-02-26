@@ -259,7 +259,7 @@ class VAE(object):
                     *[z for z in mean_kl_j]
                 )
 
-                if n % print_freq == 0:
+                if n % print_freq == 0 and print_freq is not -1:
                     tab = tabulate([
                         ['name', self.name],
                         ['episode', ep],
