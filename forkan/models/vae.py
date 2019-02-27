@@ -108,13 +108,7 @@ class VAE(object):
         self.total_loss = self.reconstruction_loss + self.beta * self.d_kl
         
         # create optimizer
-        self.opt = optimizer(learning_rate=self.lr)
-
-        # compute gradients for loss
-        self.gradients = self.opt.compute_gradients(self.total_loss)
-
-        # create training op
-        self.train_op = self.opt.apply_gradients(self.gradients)
+        self.train_op = optimizer(learning_rate=self.lr).minimize(self.total_loss)
 
         """ TF setup """
         self.s = tf.Session() or sess
