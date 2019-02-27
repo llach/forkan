@@ -95,12 +95,12 @@ class VAE(object):
         # Minimize the cross-entropy loss
         # H(x, x_hat) = -\Sigma x*log(x_hat) + (1-x)*log(1-x_hat)
         epsilon = 1e-10
-        # recon_loss = -tf.reduce_sum(
-        #     self._input * tf.log(epsilon + self._output) +
-        #     (1 - self._input) * tf.log(epsilon + 1 - self._output),
-        #     axis=1
-        # )
-        self.reconstruction_loss = tf.losses.mean_squared_error(self._input, self._output)
+        recon_loss = -tf.reduce_sum(
+            self._input * tf.log(epsilon + self._output) +
+            (1 - self._input) * tf.log(epsilon + 1 - self._output),
+            axis=1
+        )
+        self.reconstruction_loss = tf.reduce_mean(recon_loss)
 
         self.zi_kl = -0.5 * tf.reduce_sum(1 + self.logvars - tf.square(self.mus) - tf.exp(self.logvars), axis=1)
         self.d_kl = tf.reduce_mean(self.zi_kl)
