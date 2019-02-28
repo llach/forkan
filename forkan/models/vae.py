@@ -11,8 +11,14 @@ from keras.callbacks import Callback
 
 from forkan import model_path
 from forkan.common.utils import prune_dataset, create_dir, print_dict
-from forkan.models.vae_networks import create_bvae_network
+from forkan.models.vae_networks import build_network
 
+
+"""
+COPy after training
+csv stuff
+
+"""
 
 class VAECallback(Callback):
 
@@ -22,13 +28,9 @@ class VAECallback(Callback):
         self.m = model
         self.val = val
         self.epoch = 0
-        self.batch = 0
-
-    def on_batch_end(self, *args, logs={}):
-        pass
 
     def on_epoch_end(self, epoch, logs=None):
-        self.m.save()
+        self.m.vae.save_weights('{}/weights.h5'.format(self.m.savepath), overwrite=True)
 
         # log sigmas
         if self.val is not None:
@@ -135,7 +137,7 @@ class VAE(object):
                 exit(0)
 
         # load network
-        io, models, zs = create_bvae_network(self, self.input_shape, self.latent_dim, network=network)
+        io, models, zs = build_network(self.input_shape, self.latent_dim, network=network)
 
         # unpack network
         self.inputs, self.outputs = io
@@ -191,28 +193,6 @@ class VAE(object):
                        show_shapes=True)
 
         self.log.info('(beta) VAE for {} with beta = {} and |z| = {}'.format(self.network, self.beta, self.latent_dim))
-
-    def _sample(self, inputs):
-        """ Sampling from the Gaussians produced by the encoder. """
-
-        # unpack input
-        z_mean, z_log_var = inputs
-
-        # determine batch size for sampling
-        batch = K.shape(z_mean)[0]
-
-        # determine data dimensionality
-        dim = K.int_shape(z_mean)[1]
-
-        # by default, random_normal has mean=0 and sd=1.0
-        epsilon = K.random_normal(shape=(batch, dim))
-
-        # finally, compute the z value
-        return z_mean + K.exp(0.5 * z_log_var) * epsilon
-
-    def save(self):
-        """ Save current weights. """
-        self.vae.save_weights('{}/weights.h5'.format(self.savepath), overwrite=True)
 
     def encode(self, data):
         """ Encode input. Returns [z_mean, z_log_var, z]. """
