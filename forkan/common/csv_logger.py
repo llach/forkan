@@ -33,3 +33,6 @@ class CSVLogger(object):
         for i, _ in enumerate(values):
             values[i] = str(values[i])
         self.fh.write('{}\n'.format(', '.join(values)))
+
+    def flush(self):
+        self.fh.flush()

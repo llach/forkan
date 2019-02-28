@@ -95,17 +95,25 @@ class VAE(object):
         # Loss
         # Reconstruction loss
         # Minimize the cross-entropy loss
-        # H(x, x_hat) = -\Sigma x*log(x_hat) + (1-x)*log(1-x_hat)
-        recon_loss = K.binary_crossentropy(K.flatten(self._input), K.flatten(self._output))
-        self.reconstruction_loss = tf.reduce_mean(recon_loss * np.prod(input_shape))
+        # # H(x, x_hat) = -\Sigma x*log(x_hat) + (1-x)*log(1-x_hat)
+        # recon_loss = K.binary_crossentropy(K.flatten(self._input), K.flatten(self._output))
+        # self.reconstruction_loss = recon_loss * np.prod(input_shape)
+        #
+        # self.zi_kl = -0.5 * tf.reduce_sum(1 + self.logvars - tf.square(self.mus) - tf.exp(self.logvars), axis=1)
+        # self.d_kl = tf.reduce_mean(self.zi_kl)
+        #
+        # self.total_loss = tf.reduce_mean(self.reconstruction_loss + self.beta * self.d_kl)
 
-        self.zi_kl = -0.5 * tf.reduce_sum(1 + self.logvars - tf.square(self.mus) - tf.exp(self.logvars), axis=1)
-        self.d_kl = tf.reduce_mean(self.zi_kl)
+        self.re_loss = K.binary_crossentropy(K.flatten(self._input), K.flatten(self._output))
+        self.re_loss *= self.input_shape[1] ** 2  # dont square, use correct dims
 
-        self.total_loss = self.reconstruction_loss + self.beta * self.d_kl
+        # define kullback leibler divergence
+        self.kl_loss = 1 + self.logvars - K.square(self.mus) - K.exp(self.logvars)
+        self.kl_loss = -0.5 * K.sum(self.kl_loss, axis=-1)
+        self.vae_loss = K.mean(self.re_loss) + K.mean(self.beta * self.kl_loss)
         
         # create optimizer
-        self.train_op = optimizer(learning_rate=self.lr).minimize(self.total_loss)
+        self.train_op = optimizer(learning_rate=self.lr).minimize(self.vae_loss)
 
         """ TF setup """
         self.s = tf.Session() or sess
@@ -251,7 +259,7 @@ class VAE(object):
                                                                   feed_dict={self._input: x, self.bps_ph: bps,
                                                                              self.ep_ph: ep})
                 else:
-                    _, loss, kl_loss, zi_kl = self.s.run([self.train_op, self.total_loss, self.d_kl, self.zi_kl],
+                    _, loss = self.s.run([self.train_op, self.vae_loss],
                                                          feed_dict={self._input: x})
 
                 # increase batch counter
@@ -276,7 +284,7 @@ class VAE(object):
                         ['batch', n],
                         ['bps', bps],
                         ['loss', loss],
-                        ['dkl_loss', kl_loss]
+                        ['dkl_loss', 0]
                     ])
 
                     print('\n{}'.format(tab))
