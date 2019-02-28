@@ -110,7 +110,7 @@ class VAE(object):
         # define kullback leibler divergence
         self.kl_loss = 1 + self.logvars - K.square(self.mus) - K.exp(self.logvars)
         self.kl_loss = -0.5 * K.sum(self.kl_loss, axis=-1)
-        self.vae_loss = K.mean(self.re_loss) + K.mean(self.beta * self.kl_loss)
+        self.vae_loss = K.mean(self.re_loss + self.beta * K.mean(self.kl_loss))
         
         # create optimizer
         self.train_op = optimizer(learning_rate=self.lr).minimize(self.vae_loss)

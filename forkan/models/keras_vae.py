@@ -15,15 +15,6 @@ from forkan.common.utils import prune_dataset, create_dir, print_dict
 from forkan.common import CSVLogger
 from forkan.models.keras_networks import create_bvae_network
 
-"""
-def callback:
-self.vae.save_weights(dest, overwrite=True)
-print sigma
-save csv
-get rich
-
-"""
-
 
 class VAECallback(Callback):
 
@@ -36,21 +27,10 @@ class VAECallback(Callback):
         self.batch = 0
 
     def on_batch_end(self, *args, logs={}):
-        print(logs)
-        self.m.csv.writeline(
-                    datetime.now().isoformat(),
-                    self.epoch,
-                    self.batch,
-                    # loss,
-                    # kl_loss,
-                    # *[z for z in zi_kl]
-                )
-
-        self.batch += 1
+        pass
 
     def on_epoch_end(self, epoch, logs=None):
         self.m.save()
-        self.m.csv.flush()
 
         # log sigmas
         if self.val is not None:
@@ -176,8 +156,8 @@ class VAE(object):
         self.log.info('VAE has parameters:')
         print_dict(params, lo=self.log)
 
-        csv_header = ['date', '#episode', '#batch']#, 'loss', 'kl-loss'] #+ ['z{}-kl'.format(i) for i in range(self.latent_dim)]
-        self.csv = CSVLogger('{}/progress.csv'.format(self.savepath), *csv_header)
+        # csv_header = ['date', '#episode', '#batch']#, 'loss', 'kl-loss'] #+ ['z{}-kl'.format(i) for i in range(self.latent_dim)]
+        # self.csv = CSVLogger('{}/progress.csv'.format(self.savepath), *csv_header)
 
         # log summaries
         self.log.info('ENCODER')
@@ -241,6 +221,9 @@ class VAE(object):
         self.kl_loss = 1 + self.z_log_var - K.square(self.z_mean) - K.exp(self.z_log_var)
         self.kl_loss = -0.5 * K.sum(self.kl_loss, axis=-1)
         self.vae_loss = K.mean(re_loss + self.beta * self.kl_loss)
+
+        self.some = K.variable(value=0)
+        K.set_value(self.vae_loss, self.vae_loss)
 
         # register loss function
         self.vae.add_loss(self.vae_loss)
