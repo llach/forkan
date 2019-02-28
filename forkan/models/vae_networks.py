@@ -1,111 +1,207 @@
-import numpy as np
-import tensorflow as tf
-
+import sys
 import logging
+import keras.backend as K
 
-log = logging.getLogger('vae-nets')
+from keras import Model
+from keras.initializers import Constant
+from keras.layers import (Conv2D, Conv2DTranspose, Dense,
+                          Input, Lambda, Flatten, Reshape)
 
-
-def _build_conv(x, x_shape, rec_shape, latent_dim, network_type,
-                encoder_conf, decoder_conf, hiddens):
-
-    num_channels = x.shape[-1]
-
-    with tf.name_scope('encoder'):
-        log.info('===== {}-network ===== '.format(network_type))
-        log.info('input: {}'.format(x.shape))
-        log.info('===== encoder')
-        for n, (filters, kernel_size, stride) in enumerate(encoder_conf):
-            x = tf.contrib.layers.conv2d(inputs=x,
-                                         num_outputs=filters,
-                                         kernel_size=kernel_size,
-                                         stride=stride,
-                                         activation_fn=tf.nn.relu)
-            log.info('conv {} => {}'.format(n, x.shape))
-
-        encoder_last_conv_shape = x.shape
-
-        flat_encoder = tf.layers.flatten(x)
-        log.info('flatten => {}'.format(flat_encoder.shape))
-
-        fc = tf.contrib.layers.fully_connected(flat_encoder, hiddens, activation_fn=tf.nn.relu)
-        log.info('fc [ReLu] => {}'.format(fc.shape))
-        log.info('===== latent-{}'.format(latent_dim
-                                         ))
-        mus = tf.contrib.layers.fully_connected(fc, latent_dim, activation_fn=None)
-        logvars = tf.contrib.layers.fully_connected(fc, latent_dim, activation_fn=None)
-        log.info('mus: {}'.format(mus.shape))
-        log.info('logvars: {}'.format(logvars.shape))
-
-        z = mus + tf.exp(0.5 * logvars) * tf.random_normal(tf.shape(mus))
-
-        log.info('==> z {}'.format(z.shape))
-        log.info('===== encoder')
-
-    with tf.name_scope('decoder'):
-        fcd = tf.contrib.layers.fully_connected(z, hiddens, activation_fn=tf.nn.relu)
-        log.info('fc [ReLu] => {}'.format(fcd.shape))
-
-        fcd2 = tf.contrib.layers.fully_connected(fcd, int(np.prod(encoder_last_conv_shape[1:])), activation_fn=None)
-        log.info('fc [None] => {}'.format(fcd2.shape))
-
-        x = tf.reshape(fcd2, shape=rec_shape)
-
-        log.info('reshape => {}'.format(x.shape))
-
-        for n, (filters, kernel_size, stride) in enumerate(decoder_conf):
-            x = tf.contrib.layers.conv2d_transpose(inputs=x,
-                                                   num_outputs=filters,
-                                                   kernel_size=kernel_size,
-                                                   stride=stride,
-                                                   activation_fn=tf.nn.relu)
-            log.info('conv.T {} => {}'.format(n, x.shape))
-
-        out = tf.contrib.layers.conv2d_transpose(inputs=x,
-                                                 num_outputs=num_channels,
-                                                 kernel_size=1,
-                                                 stride=1,
-                                                 activation_fn=tf.nn.sigmoid)
-
-    log.info('output: {}'.format(out.shape))
-    assert x_shape[1:] == out.shape[1:], 'input\'s {} and ouput\'s {} shape need to match!'.format(x_shape[1:],
-                                                                                                   out.shape[1:])
-
-    return mus, logvars, z, out
+logger = logging.getLogger(__name__)
 
 
-def build_network(x, x_shape, latent_dim=10, network_type='atari'):
+def create_bvae_network(model, input_shape, latent_dim,
+                        network='dsprites', initial_bias=0.1, ):
+    # define encoder input layer
+    inputs = Input(shape=input_shape)
 
-    if network_type == 'atari':
-        # this must not depend on input tensor, otherwise the decoder graph
-        # could not be run independently form the encoder
-        rec_shape = (-1, int(x_shape[1] / 4), int(x_shape[2] / 4), 64)
+    ############################################
+    #####               DSPRITES           #####
+    ############################################
+    if network == 'dsprites':
+        kernel = 4
+        strides = (2, 2)
+        filter = 32
 
-        encoder_conf = zip([32, 64],  # num filter
-                           [2, 2],  # kernel size
-                           [(2, 2), (2, 2)]) # strides
+        # prepare encoder
+        x = Conv2D(filter, kernel, strides=strides, padding='same',
+                   data_format='channels_last', activation='relu',
+                   bias_initializer=Constant(initial_bias),
+                   name='enc-conv-1')(inputs)
 
-        decoder_conf = zip([64, 32],  # num filter
-                           [2, 2],  # kernel size
-                           [(2, 2), (2, 2)]) # strides
+        x = Conv2D(filter, kernel, strides=strides, padding='same',
+                   data_format='channels_last', activation='relu',
+                   bias_initializer=Constant(initial_bias),
+                   name='enc-conv-2')(x)
 
-        hiddens = 512
-    elif network_type == 'dsprites':
-        # this must not depend on input tensor, otherwise the decoder graph
-        # could not be run independently form the encoder
-        rec_shape = (-1, int(x_shape[1] / 16), int(x_shape[2] / 16), 64)
+        x = Conv2D(filter * 2, kernel, strides=strides, padding='same',
+                   data_format='channels_last', activation='relu',
+                   bias_initializer=Constant(initial_bias),
+                   name='enc-conv-3')(x)
 
-        encoder_conf = zip([32, 32, 64, 64], # num filter
-                           [4]*4, # kernel size
-                           [(2, 2)]*4) # strides
+        x = Conv2D(filter * 2, kernel, strides=strides, padding='same',
+                   data_format='channels_last', activation='relu',
+                   bias_initializer=Constant(initial_bias),
+                   name='enc-conv-4')(x)
 
-        decoder_conf = zip([64, 64, 32, 32],  # num filter
-                           [4]*4,  # kernel size
-                           [(2, 2)]*4)  # strides
+        # shape info needed to build decoder model
+        conv_shape = K.int_shape(x)
 
-        hiddens = 256
+        x = Flatten()(x)
+        x = Dense(256, activation='relu', bias_initializer=Constant(initial_bias),
+                  name='enc-dense')(x)
+
+        # latent variables means and log(standard deviation)
+        # leave the z activations linear!
+        z_mean = Dense(latent_dim)(x)
+        z_log_var = Dense(latent_dim)(x)
+        z = Lambda(model._sample, output_shape=(latent_dim,), name='z')([z_mean, z_log_var])
+
+        # final encoder layer is sampling layer
+        encoder = Model(inputs, [z_mean, z_log_var, z], name='encoder')
+
+        # define decoder input layer
+        de_inputs = Input(shape=(latent_dim,))
+
+        # prepare decoder
+        # this part is not explicitly given in the paper. it reads just 'reverse order'
+        x = Dense(256, activation='relu', bias_initializer=Constant(initial_bias),
+                  name='dec-dense')(de_inputs)
+
+        x = Dense(conv_shape[1] * conv_shape[2] * conv_shape[3], activation='linear',
+                  bias_initializer=Constant(initial_bias), name='dec-reshape')(x)
+
+        x = Reshape((conv_shape[1], conv_shape[2], conv_shape[3]))(x)
+
+        x = Conv2DTranspose(filter * 2, kernel, strides=strides, padding='same',
+                            data_format='channels_last', activation='relu',
+                            bias_initializer=Constant(initial_bias),
+                            name='dec-convT-1')(x)
+
+        x = Conv2DTranspose(filter * 2, kernel, strides=strides, padding='same',
+                            data_format='channels_last', activation='relu',
+                            bias_initializer=Constant(initial_bias),
+                            name='dec-convT-2')(x)
+
+        x = Conv2DTranspose(filter, kernel, strides=strides, padding='same',
+                            data_format='channels_last', activation='relu',
+                            bias_initializer=Constant(initial_bias),
+                            name='dec-convT-3')(x)
+
+        x = Conv2DTranspose(filter, kernel, strides=strides, padding='same',
+                            data_format='channels_last', activation='relu',
+                            bias_initializer=Constant(initial_bias),
+                            name='dec-convT-4')(x)
+
+        # this one is mainly to normalize outputs and reduce depth to the original one
+        x = Conv2DTranspose(1, kernel, strides=1, padding='same',
+                            data_format='channels_last', activation='sigmoid',
+                            bias_initializer=Constant(initial_bias),
+                            name='dec-output')(x)
+
+        # decoder restores input in last layer
+        decoder = Model(de_inputs, x, name='decoder')
+
+        # complete auto encoder
+        # the encoder ouput index passed to the decoder MUST mach z.
+        # otherwise, no gradient can be computed.
+        outputs = decoder(encoder(inputs)[2])
+        vae = Model(inputs, outputs, name='full-vae')
+
+    ############################################
+    #####                ATARI             #####
+    ############################################
+    elif network == 'atari':
+        kernel = 4
+        strides = (2, 2)
+        filter = 32
+
+        # prepare encoder
+        x = Conv2D(filter, kernel, strides=strides, padding='same',
+                   data_format='channels_last', activation='relu',
+                   bias_initializer=Constant(initial_bias),
+                   name='enc-conv-1')(inputs)
+
+        x = Conv2D(filter, kernel, strides=strides, padding='same',
+                   data_format='channels_last', activation='relu',
+                   bias_initializer=Constant(initial_bias),
+                   name='enc-conv-2')(x)
+
+        x = Conv2D(filter * 2, kernel, strides=strides, padding='same',
+                   data_format='channels_last', activation='relu',
+                   bias_initializer=Constant(initial_bias),
+                   name='enc-conv-3')(x)
+
+        x = Conv2D(filter * 2, kernel, strides=1, padding='same',
+                   data_format='channels_last', activation='relu',
+                   bias_initializer=Constant(initial_bias),
+                   name='enc-conv-4')(x)
+
+        # shape info needed to build decoder model
+        conv_shape = K.int_shape(x)
+
+        x = Flatten()(x)
+        x = Dense(256, activation='relu', bias_initializer=Constant(initial_bias),
+                  name='enc-dense')(x)
+
+        # latent variables means and log(standard deviation)
+        # leave the z activations linear!
+        z_mean = Dense(latent_dim)(x)
+        z_log_var = Dense(latent_dim)(x)
+        z = Lambda(model._sample, output_shape=(latent_dim,), name='z')([z_mean, z_log_var])
+
+        # final encoder layer is sampling layer
+        encoder = Model(inputs, [z_mean, z_log_var, z], name='encoder')
+
+        # define decoder input layer
+        de_inputs = Input(shape=(latent_dim,))
+
+        # prepare decoder
+        # this part is not explicitly given in the paper. it reads just 'reverse order'
+        x = Dense(256, activation='relu', bias_initializer=Constant(initial_bias),
+                  name='dec-dense')(de_inputs)
+
+        x = Dense(conv_shape[1] * conv_shape[2] * conv_shape[3], activation='linear',
+                  bias_initializer=Constant(initial_bias), name='dec-reshape')(x)
+
+        x = Reshape((conv_shape[1], conv_shape[2], conv_shape[3]))(x)
+
+        x = Conv2DTranspose(filter * 2, kernel, strides=1, padding='same',
+                            data_format='channels_last', activation='relu',
+                            bias_initializer=Constant(initial_bias),
+                            name='dec-convT-1')(x)
+
+        x = Conv2DTranspose(filter * 2, kernel, strides=strides, padding='same',
+                            data_format='channels_last', activation='relu',
+                            bias_initializer=Constant(initial_bias),
+                            name='dec-convT-2')(x)
+
+        x = Conv2DTranspose(filter, kernel, strides=strides, padding='same',
+                            data_format='channels_last', activation='relu',
+                            bias_initializer=Constant(initial_bias),
+                            name='dec-convT-3')(x)
+
+        x = Conv2DTranspose(filter, kernel, strides=strides, padding='same',
+                            data_format='channels_last', activation='relu',
+                            bias_initializer=Constant(initial_bias),
+                            name='dec-convT-4')(x)
+
+        # this one is mainly to normalize outputs and reduce depth to the original one
+        x = Conv2DTranspose(3, kernel, strides=1, padding='same',
+                            data_format='channels_last', activation='sigmoid',
+                            bias_initializer=Constant(initial_bias),
+                            name='dec-output')(x)
+
+        # decoder restores input in last layer
+        decoder = Model(de_inputs, x, name='decoder')
+
+        # complete auto encoder
+        # the encoder ouput index passed to the decoder MUST mach z.
+        # otherwise, no gradient can be computed.
+        outputs = decoder(encoder(inputs)[2])
+        vae = Model(inputs, outputs, name='full-vae')
     else:
-        log.cirical('network \'{}\' unknown'.format(network_type))
-        exit(1)
+        logger.critical('Network type {} does not exist for bVAE'.format(network))
+        sys.exit(1)
 
-    return _build_conv(x, x_shape, rec_shape, latent_dim, network_type, encoder_conf, decoder_conf, hiddens)
+    return (inputs, outputs), (encoder, decoder, vae), (z_mean, z_log_var, z)
