@@ -10,35 +10,52 @@ from keras import backend as K
 from keras.callbacks import Callback
 
 from forkan import model_path
-from forkan.common.utils import prune_dataset, create_dir, print_dict
+from forkan.common.csv_logger import CSVLogger
+from forkan.common.utils import prune_dataset, create_dir, print_dict, clean_dir, copytree
 from forkan.models.vae_networks import build_network
 
-
-"""
-COPy after training
-csv stuff
-
-"""
 
 class VAECallback(Callback):
 
     def __init__(self, model, val=None):
         super().__init__()
 
+        self.log = logging.getLogger('vae_CB')
+
         self.m = model
         self.val = val
         self.epoch = 0
+        self.batch = 0
+
+        if self.val is None:
+            self.log.warning('No validation set given. Won\'t log to csv.')
+
+    def on_batch_end(self, batch, logs=None):
+        self.batch += 1
 
     def on_epoch_end(self, epoch, logs=None):
         self.m.vae.save_weights('{}/weights.h5'.format(self.m.savepath), overwrite=True)
 
         # log sigmas
         if self.val is not None:
-            logvars = np.mean(self.m.encode(self.val)[1], axis=0)
-            sigmas = np.exp(0.5 * logvars)
-            print('STD.DEV.\n', sigmas)
+            mus, logvars = self.m.encode(self.val)[:2]
+            logvars = np.mean(logvars, axis=0)
+            mus = np.mean(mus, axis=0)
 
-        self.epoch += 1
+            sigmas = np.exp(0.5 * logvars)
+
+            print('STD.DEV.\n', sigmas)
+            print('MU.\n', mus)
+
+            self.m.csv.writeline(
+                    datetime.now().isoformat(),
+                    self.epoch,
+                    self.batch,
+                    *mus,
+                    *sigmas,
+                ) # todo add losses
+
+            self.epoch += 1
 
 
 class VAE(object):
@@ -82,11 +99,6 @@ class VAE(object):
 
         self.log = logging.getLogger('vae')
 
-        # define vae specific variables
-        self.beta = beta
-        self.latent_dim = latent_dim
-        self.input_shape = input_shape
-
         # some metadata for weight file names
         self.name = name
 
@@ -96,6 +108,7 @@ class VAE(object):
             if len(input_shape) == 2:
                 input_shape = input_shape + (1,)
 
+            self.input_shape = input_shape
             self.latent_dim = latent_dim
             self.network = network
             self.beta = beta
@@ -144,6 +157,10 @@ class VAE(object):
         self.encoder, self.decoder, self.vae = models
         self.z_mean, self.z_log_var, self.z = zs
 
+        # encode, decode functions
+        self.encode = lambda x: self.encoder.predict(x)
+        self.decode = lambda x: self.decoder.predict(x)
+
         # make sure that input and output shapes match
         assert self.inputs._keras_shape[1:] == self.outputs._keras_shape[1:]
 
@@ -170,8 +187,10 @@ class VAE(object):
         # compile entire auto encoder
         self.vae.compile(optimizer, metrics=['accuracy'])
 
-        # csv_header = ['date', '#episode', '#batch']#, 'loss', 'kl-loss'] #+ ['z{}-kl'.format(i) for i in range(self.latent_dim)]
-        # self.csv = CSVLogger('{}/progress.csv'.format(self.savepath), *csv_header)
+        csv_header = ['date', '#episode', '#batch']\
+                     + ['mu-{}'.format(i) for i in range(self.latent_dim)]\
+                     + ['sigma-{}'.format(i) for i in range(self.latent_dim)] # todo add losses
+        self.csv = CSVLogger('{}/progress.csv'.format(self.savepath), *csv_header)
 
         # log summaries
         self.log.info('ENCODER')
@@ -193,14 +212,6 @@ class VAE(object):
                        show_shapes=True)
 
         self.log.info('(beta) VAE for {} with beta = {} and |z| = {}'.format(self.network, self.beta, self.latent_dim))
-
-    def encode(self, data):
-        """ Encode input. Returns [z_mean, z_log_var, z]. """
-        return self.encoder.predict(data)
-
-    def decode(self, latents):
-        """ Reconstructs sample from latent space. """
-        return self.decoder.predict(latents)
 
     def train(self, data, val=None, num_episodes=50, batch_size=128):
         """
@@ -224,6 +235,21 @@ class VAE(object):
         elapsed = datetime.now() - start
         self.log.info('Training took {}.'.format(elapsed))
 
+        # empty buffers
+        self.csv.flush()
+
+        newest = '{}/{}/'.format(self.parent_dir, self.name)
+        self.log.info('done training!\ncopying files to {}'.format(newest))
+
+        # create, clean & copy
+        create_dir(newest)
+        clean_dir(newest, with_files=True)
+        copytree(self.savepath, newest)
+
+        # as reference, we leave a file containing the foldername of the just copied model
+        with open('{}from'.format(newest), 'a') as fi:
+            fi.write('{}\n'.format(self.savepath.split('/')[-2]))
+
 
 # simple test using dsprites dataset
 if __name__ == '__main__':
@@ -233,5 +259,6 @@ if __name__ == '__main__':
     shape = (64, 64, 1)
     (data, _) = load_dsprites('translation', repetitions=10)
 
-    vae = VAE(input_shape=(64, 64, 1), network='dsprites', name='trans')
-    vae.train(data[:1024])
+    v = VAE(load_from='trans')
+    # vae = VAE(input_shape=(64, 64, 1), network='dsprites', name='trans')
+    # vae.train(data[:128], num_episodes=3)
