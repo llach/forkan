@@ -162,7 +162,8 @@ class VAE(object):
         self.decode = lambda x: self.decoder.predict(x)
 
         # make sure that input and output shapes match
-        assert self.inputs._keras_shape[1:] == self.outputs._keras_shape[1:]
+        assert self.inputs._keras_shape[1:] == self.outputs._keras_shape[1:], 'shape mismatch: in {} out {}'.format(self.inputs._keras_shape[1:],
+                                                                                                                    self.outputs._keras_shape[1:])
 
         if load_from is not None:
             self.log.info('restoring graph ... ')
