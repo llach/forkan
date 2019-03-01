@@ -8,6 +8,7 @@ from keras.losses import binary_crossentropy
 from keras.utils import plot_model
 from keras import backend as K
 from keras.callbacks import Callback
+from keras import optimizers
 
 from forkan import model_path
 from forkan.common.csv_logger import CSVLogger
@@ -70,7 +71,7 @@ class VAE(object):
                  lr=1e-3,
                  load_from=None,
                  sess=None, # might not be needed, depending on how keras handles multiple sessions
-                 optimizer='adam'
+                 optimizer=optimizers.Adam
                  ):
         """
 
@@ -127,6 +128,7 @@ class VAE(object):
             params.pop('self')
             params.pop('sess')
             params.pop('load_from')
+            params.pop('optimizer')
 
             with open('{}/params.json'.format(self.savepath), 'w') as outfile:
                 json.dump(params, outfile)
@@ -186,7 +188,7 @@ class VAE(object):
         self.vae.add_loss(self.vae_loss)
 
         # compile entire auto encoder
-        self.vae.compile(optimizer, metrics=['accuracy'])
+        self.vae.compile(optimizer(lr=self.lr), metrics=['accuracy'])
 
         csv_header = ['date', '#episode', '#batch']\
                      + ['mu-{}'.format(i) for i in range(self.latent_dim)]\
@@ -212,7 +214,8 @@ class VAE(object):
                        to_file='vae.png',
                        show_shapes=True)
 
-        self.log.info('(beta) VAE for {} with beta = {} and |z| = {}'.format(self.network, self.beta, self.latent_dim))
+        self.log.info('(beta) VAE for {} with beta = {} and |z| = {} and learning rate of {}'
+                      .format(self.network, self.beta, self.latent_dim, self.lr))
 
     def train(self, data, val=None, num_episodes=50, batch_size=128):
         """
