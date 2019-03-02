@@ -132,6 +132,11 @@ class VAE(object):
 
             with open('{}/params.json'.format(self.savepath), 'w') as outfile:
                 json.dump(params, outfile)
+
+            # store from file anyways
+            with open('{}from'.format(self.savepath), 'a') as fi:
+                fi.write('{}\n'.format(self.savepath.split('/')[-2]))
+
         else:  # load old parameter
 
             self.savename = load_from
@@ -160,8 +165,8 @@ class VAE(object):
         self.z_mean, self.z_log_var, self.z = zs
 
         # encode, decode functions
-        self.encode = lambda x: self.encoder.predict(x)
-        self.decode = lambda x: self.decoder.predict(x)
+        self.encode = lambda x: np.asarray(self.encoder.predict(x))
+        self.decode = lambda x: np.asarray(self.decoder.predict(x))
 
         # make sure that input and output shapes match
         assert self.inputs._keras_shape[1:] == self.outputs._keras_shape[1:], 'shape mismatch: in {} out {}'.format(self.inputs._keras_shape[1:],
