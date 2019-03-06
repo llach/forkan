@@ -116,6 +116,9 @@ class VAE(object):
             self.name = name
             self.lr = lr
 
+            if self.name is None or self.name == '':
+                self.name = 'default'
+
             self.savename = '{}-b{}-lat{}-lr{}-{}'.format(name, beta, latent_dim, lr,
                                                           datetime.now().strftime('%Y-%m-%dT%H:%M'))
             self.parent_dir = '{}vae-{}'.format(model_path, network)
