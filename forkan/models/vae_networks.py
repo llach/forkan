@@ -103,7 +103,7 @@ def build_network(input_shape, latent_dim, network='dsprites', initial_bias=0.1)
     ############################################
     #####               DSPRITES           #####
     ############################################
-    if network == 'dsprites':
+    if network == 'dsprites' or network == 'pendulum':
         hiddens = 256
 
         encoder_conf = zip([32, 32, 64, 64],  # num filter

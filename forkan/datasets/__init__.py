@@ -9,3 +9,6 @@ from forkan.datasets.dsprites import load_dsprites, load_dsprites_one_fixed
 def load_atari_normalized(env):
     name = env.replace('NoFrameskip', '').lower().split('-')[0]
     return np.load('{}/{}-normalized.npz'.format(dataset_path, name))['data']
+
+def load_pendulum():
+    return np.load('{}/pendulum-random-normalized-cut.npz'.format(dataset_path))['data']
