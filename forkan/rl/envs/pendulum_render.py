@@ -43,13 +43,8 @@ class PendulumRenderEnv(EnvWrapper):
 
     def step(self, action):
         _, reward, done, info = self.env.step(action)
-
-        if done:
-            obs = self.reset()
-            return obs, reward, [done], info
-        else:
-            obs = self.env.render(mode='rgb_array')
-            return self._process(obs), reward, [done], info
+        obs = self.env.render(mode='rgb_array')
+        return self._process(obs), reward, done, info
 
     def reset(self):
         _ = self.env.reset()
