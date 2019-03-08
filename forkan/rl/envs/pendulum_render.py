@@ -32,13 +32,13 @@ class PendulumRenderEnv(EnvWrapper):
 
         self.num_envs = 1
 
-        self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(64, 64, 1))
+        self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(64, 64, 1), dtype=np.float)
 
     def _process(self, obs):
         obs = obs / 255  # normalise
         obs = obs[121:256 + 121, 121:256 + 121, :]  # cut out interesting area
         obs = np.dot(obs[..., :3], [0.299, 0.587, 0.114])  # inverted greyscale
-        obs = resize(obs, (64, 64))
+        obs = resize(obs, (64, 64), mode='reflect', anti_aliasing=True)
         return np.expand_dims(np.expand_dims(obs, -1), 0)
 
     def step(self, action):
