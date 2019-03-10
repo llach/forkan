@@ -30,20 +30,26 @@ class PendulumRenderVAEEnv(EnvWrapper):
 
         # inheriting from EnvWrapper and passing it an env makes spaces available.
         super().__init__(env)
+        self.max_speed = 8
+        high = np.array([1., 1., self.max_speed])
 
         self.v = VAE(load_from='pend-optimal', network='pendulum')
-        self.observation_space = spaces.Box(low=-np.infty, high=np.infty, shape=(self.v.latent_dim*2,), dtype=np.float)
+        self.observation_space = spaces.Box(low=-high, high=high, dtype=np.float)
 
-        self.old_z = np.zeros([self.v.latent_dim])
+        self.logger.warning('THIS VERSION INCLUDES SOME HORRIBLE HACKS, SUCH AS A HARDCODED INDEX FOR THE LATENT THAT'
+                            'REPRESENTS THETA. DON\' USE FOR REAL RESULTS.' )
+
+        self.old_z = 0
 
     def _process(self, obs):
 
         zs = self.v.encode(obs)[-1]
-        thed = (zs - self.old_z) / 0.05
-        con = np.concatenate([zs, thed], axis=-1)
-        self.old_z = zs.copy()
+        z = zs[0][2]
+        thed = np.clip((z - self.old_z) / 0.05, -self.max_speed, self.max_speed)
+        # con = np.concatenate([zs, thed], axis=-1)
+        self.old_z = z
 
-        return con
+        return np.asarray([np.sin(z), np.cos(z), thed])
 
     def step(self, action):
         obs, reward, done, info = self.env.step(action)
@@ -51,4 +57,5 @@ class PendulumRenderVAEEnv(EnvWrapper):
 
     def reset(self):
         obs = self.env.reset()
+        self.old_z = 0
         return self._process(obs)
