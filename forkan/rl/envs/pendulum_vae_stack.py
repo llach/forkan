@@ -30,15 +30,15 @@ class PendulumVAEStackEnv(EnvWrapper):
                             'REPRESENTS THETA. DON\'T USE FOR REAL RESULTS.')
 
         self.buf = deque(maxlen=self.k)
-        self.reset()
+        self._reset_buffer()
 
     def _reset_buffer(self):
         for _ in range(self.k):
-            self.buf.append(0)
+            self.buf.appendleft(0)
 
     def _process(self, obs):
         zs = self.v.encode(obs)[-1]
-        self.buf.append(zs[0][2])
+        self.buf.appendleft(zs[0][2])
         return np.asarray(self.buf.copy(), dtype=np.float)
 
     def step(self, action):
