@@ -4,13 +4,13 @@ import socket
 import logging
 import coloredlogs
 
-from logging.config import dictConfig
-from forkan.common.utils import create_dir, textbf, textcolor
-
 model_path = os.environ['HOME'] + '/.forkan/models/'
 dataset_path = os.environ['HOME'] + '/.forkan/datasets/'
 figure_path = os.environ['HOME'] + '/.forkan/figures/'
 log_file = os.environ['HOME'] + '/.forkan/log.txt'
+
+from logging.config import dictConfig
+from forkan.common.utils import create_dir, textbf, textcolor
 
 fixed_seed = True
 

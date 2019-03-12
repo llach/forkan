@@ -1,17 +1,21 @@
 import os
 import math
+import json
 import errno
 import shutil
 import numpy as np
 import functools
 import inspect
 import logging
+import datetime
 import matplotlib.pyplot as plt
 
 
 from PIL import Image
 from shutil import rmtree
 from keras.utils import to_categorical
+
+from forkan import model_path
 
 logger = logging.getLogger()
 
@@ -64,6 +68,38 @@ def print_dict(d, lo=None):
     for k, v in d.items():
         lo.info('     {}: {}'.format(k, v))
     lo.info('}')
+
+
+def log_alg(name, env_id, params, vae, num_envs=1, save=True):
+    params.update({'nenvs': num_envs})
+
+    print_dict(params)
+
+    env_id_lower = env_id.replace('NoFrameskip', '').lower().split('-')[0]
+
+    if vae is not None and vae is not '':
+        savename = '{}-{}-nenv{}-{}'.format(env_id_lower, vae, num_envs, datetime.datetime.now().strftime('%Y-%m-%dT%H:%M'))
+    else:
+        savename = '{}-noVAE-nenv{}-{}'.format(env_id_lower, num_envs, datetime.datetime.now().strftime('%Y-%m-%dT%H:%M'))
+
+    savepath = '{}{}-TEST/{}/'.format(model_path, name, savename)
+
+    if save: create_dir(savepath)
+
+    # clean params form non-serializable objects
+    for par in ['env', 'params']:
+        if par in params.keys():
+            params.pop(par)
+
+    if save:
+        # store from file anyways
+        with open('{}from'.format(savepath), 'a') as fi:
+            fi.write('{}\n'.format(savename))
+
+        with open('{}/params.json'.format(savepath), 'w') as outfile:
+            json.dump(params, outfile)
+
+    return savepath, env_id_lower
 
 
 def discount_with_dones(rewards, dones, gamma):
