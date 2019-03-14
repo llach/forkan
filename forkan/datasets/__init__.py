@@ -11,4 +11,4 @@ def load_atari_normalized(env):
     return np.load('{}/{}-normalized.npz'.format(dataset_path, name))['data']
 
 def load_pendulum():
-    return np.load('{}/pendulum-random-normalized-cut.npz'.format(dataset_path))['data']
+    return np.load('{}/pendulum-visual-random-normalized-cut.npz'.format(dataset_path))['data']
