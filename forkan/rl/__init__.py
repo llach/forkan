@@ -3,7 +3,8 @@ import inspect
 import logging
 
 from forkan.rl.env_wrapper import EnvWrapper
-from forkan.rl.envs import AtariPrep, MultiEnv, LazyVAE, FakeLazyVAE, PendulumRenderEnv,PendulumRenderVAEEnv, PendulumVAEStackEnv
+from forkan.rl.envs import AtariPrep, MultiEnv, LazyVAE, FakeLazyVAE, PendulumRenderEnv,\
+    PendulumRenderVAEEnv, PendulumVAEStackEnv, VecVAEStack
 
 from forkan.rl.envs.multi_stepper import MultiStepper
 
