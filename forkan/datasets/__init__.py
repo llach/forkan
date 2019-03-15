@@ -12,3 +12,6 @@ def load_atari_normalized(env):
 
 def load_pendulum():
     return np.load('{}/pendulum-visual-random-normalized-cut.npz'.format(dataset_path))['data']
+
+def load_uniform_pendulum():
+    return np.load('{}/pendulum-visual-uniform.npz'.format(dataset_path))['data']
