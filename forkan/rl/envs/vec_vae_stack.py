@@ -42,9 +42,9 @@ class VecVAEStack(EnvWrapper):
                 q.appendleft([0]*self.v.latent_dim)
 
     def _process(self, obs):
-        _, _, zs = self.v.encode(obs)
+        mus, _, _ = self.v.encode(obs)
         for i in range(self.nenvs):
-            self.queues[i].appendleft(zs[i])
+            self.queues[i].appendleft(mus[i])
 
     def _get_obs(self):
         return np.asarray(self.queues).reshape([self.nenvs, -1])
