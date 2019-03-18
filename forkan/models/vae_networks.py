@@ -1,13 +1,47 @@
 import sys
 import logging
+import numpy as np
 import keras.backend as K
 
 from keras import Model
+from keras.metrics import binary_crossentropy
 from keras.initializers import Constant
-from keras.layers import (Conv2D, Conv2DTranspose, Dense,
+from keras.layers import (Conv2D, Conv2DTranspose, Dense, Layer,
                           Input, Lambda, Flatten, Reshape)
 
 logger = logging.getLogger(__name__)
+
+
+class ReconstructionLossLayer(Layer):
+    def __init__(self, input_dim, **kwargs):
+        self.input_dim = input_dim
+        self.is_placeholder = True
+        super().__init__(**kwargs)
+
+    def call(self, inputs, **kwargs):
+        x = inputs[0]
+        x_hat = inputs[1]
+        xent_loss = self.input_dim * binary_crossentropy(K.flatten(x), K.flatten(x_hat))
+        self.add_loss(xent_loss, inputs=inputs)
+        return xent_loss
+
+
+class KLLossLayer(Layer):
+    def __init__(self, beta, **kwargs):
+        self.is_placeholder = True
+        super().__init__(**kwargs)
+        self.beta = beta
+
+    def call(self, inputs, **kwargs):
+        z_mean = inputs[0]
+        z_log_var = inputs[1]
+        print('beta, ', self.beta)
+
+        kl_loss = 1 + z_log_var - K.square(z_mean) - K.exp(z_log_var)
+        kl_loss = -0.5 * K.sum(kl_loss, axis=-1)
+
+        self.add_loss(self.beta*kl_loss, inputs=inputs)
+        return kl_loss
 
 
 def _sample(inputs):
@@ -29,11 +63,11 @@ def _sample(inputs):
     return z_mean + K.exp(0.5 * z_log_var) * epsilon
 
 
-def create_bvae_network(input_shape, latent_dim, encoder_conf, decoder_conf, hiddens=256, initial_bias=0.1):
+def create_bvae_network(input_shape, latent_dim, beta, encoder_conf, decoder_conf, hiddens=256, initial_bias=0.1):
     # define encoder input layer
-    inputs = Input(shape=input_shape)
+    vae_input = Input(shape=input_shape)
 
-    x = inputs
+    x = vae_input
     for n, (filters, kernel_size, stride) in enumerate(encoder_conf):
 
         # prepare encoder
@@ -41,7 +75,6 @@ def create_bvae_network(input_shape, latent_dim, encoder_conf, decoder_conf, hid
                    data_format='channels_last', activation='relu',
                    bias_initializer=Constant(initial_bias),
                    name='enc-conv-{}'.format(n))(x)
-
 
     # shape info needed to build decoder model
     conv_shape = K.int_shape(x)
@@ -56,8 +89,11 @@ def create_bvae_network(input_shape, latent_dim, encoder_conf, decoder_conf, hid
     z_log_var = Dense(latent_dim)(x)
     z = Lambda(_sample, output_shape=(latent_dim,), name='z')([z_mean, z_log_var])
 
+    # we define the individual loss compnents as layers so we can log them in callbacks
+    y_kl = KLLossLayer(beta=beta, name='KLLossLayer')([z_mean, z_log_var])
+
     # final encoder layer is sampling layer
-    encoder = Model(inputs, [z_mean, z_log_var, z], name='encoder')
+    encoder = Model(vae_input, [z_mean, z_log_var, z, y_kl], name='encoder')
 
     # define decoder input layer
     de_inputs = Input(shape=(latent_dim,))
@@ -80,26 +116,28 @@ def create_bvae_network(input_shape, latent_dim, encoder_conf, decoder_conf, hid
                    bias_initializer=Constant(initial_bias),
                    name='enc-conv-{}'.format(n))(x)
 
-
     # this one is mainly to normalize outputs and reduce depth to the original one
-    x = Conv2DTranspose(1, 1, strides=1, padding='same',
+    x_hat = Conv2DTranspose(1, 1, strides=1, padding='same',
                         data_format='channels_last', activation='sigmoid',
                         bias_initializer=Constant(initial_bias),
                         name='dec-output')(x)
 
+    y_ent = ReconstructionLossLayer(input_dim=np.prod(input_shape), name='ReconstructionLossLayer')([vae_input, x_hat])
+
     # decoder restores input in last layer
-    decoder = Model(de_inputs, x, name='decoder')
+    decoder = Model([de_inputs, vae_input], [x_hat, y_ent], name='decoder')
 
     # complete auto encoder
     # the encoder ouput index passed to the decoder MUST mach z.
     # otherwise, no gradient can be computed.
-    outputs = decoder(encoder(inputs)[2])
-    vae = Model(inputs, outputs, name='full-vae')
+    vae_output = decoder([encoder(vae_input)[2], vae_input])
 
-    return (inputs, outputs), (encoder, decoder, vae), (z_mean, z_log_var, z)
+    vae = Model(vae_input, vae_output, name='full-vae')
+
+    return (vae_input, x_hat), (encoder, decoder, vae), (z_mean, z_log_var, z)
 
 
-def build_network(input_shape, latent_dim, network='dsprites', initial_bias=0.1):
+def build_network(input_shape, latent_dim, beta, network='dsprites', initial_bias=0.1):
     ############################################
     #####               DSPRITES           #####
     ############################################
@@ -132,5 +170,5 @@ def build_network(input_shape, latent_dim, network='dsprites', initial_bias=0.1)
         logger.critical('Network type {} does not exist for bVAE'.format(network))
         sys.exit(1)
 
-    return create_bvae_network(input_shape, latent_dim, encoder_conf, decoder_conf,
+    return create_bvae_network(input_shape, latent_dim, beta, encoder_conf, decoder_conf,
                                hiddens=hiddens, initial_bias=initial_bias)

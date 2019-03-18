@@ -4,10 +4,9 @@ import numpy as np
 import logging
 
 from datetime import datetime
-from keras.losses import binary_crossentropy
 from keras.utils import plot_model
 from keras import backend as K
-from keras.callbacks import Callback
+from keras.callbacks import Callback, LambdaCallback
 from keras import optimizers
 
 from forkan import model_path
@@ -39,7 +38,7 @@ class VAECallback(Callback):
 
         # log sigmas
         if self.val is not None:
-            mus, logvars = self.m.encode(self.val)[:2]
+            mus, logvars, zs, kl = self.m.encoder.predict(self.val)
             logvars = np.mean(logvars, axis=0)
             mus = np.mean(mus, axis=0)
 
@@ -48,13 +47,18 @@ class VAECallback(Callback):
             print('STD.DEV.\n', sigmas)
             print('MU.\n', mus)
 
+            x_hat, rec_loss = self.m.decoder.predict([zs, self.val])
+            kl_mean, rec_mean = np.mean(kl), np.mean(rec_loss)
+
             self.m.csv.writeline(
                     datetime.now().isoformat(),
                     self.epoch,
                     self.batch,
+                    rec_mean,
+                    kl_mean,
                     *mus,
                     *sigmas,
-                ) # todo add losses
+                )
 
             self.epoch += 1
 
@@ -70,7 +74,8 @@ class VAE(object):
                  plot_models=False,
                  lr=1e-3,
                  load_from=None,
-                 sess=None, # might not be needed, depending on how keras handles multiple sessions
+                 batch_norm=True,
+                 warmup=None,
                  optimizer=optimizers.Adam
                  ):
         """
@@ -86,7 +91,7 @@ class VAE(object):
             shape of desired input as tuple
 
         latent_dim : int
-            number of nodes in bottleneck layer aka size of latent dimesion
+            number of nodes in bottleneck layer aka size of latent dimension
 
         network : str
             string identifier for network architecture as defined in 'networks.py'
@@ -112,15 +117,20 @@ class VAE(object):
             self.input_shape = input_shape
             self.latent_dim = latent_dim
             self.network = network
-            self.beta = beta
             self.name = name
             self.lr = lr
 
             if self.name is None or self.name == '':
                 self.name = 'default'
 
-            self.savename = '{}-b{}-lat{}-lr{}-{}'.format(name, beta, latent_dim, lr,
-                                                          datetime.now().strftime('%Y-%m-%dT%H:%M'))
+            self.savename = '{}-b{}-lat{}-lr{}'.format(name, beta, latent_dim, lr)
+            if batch_norm:
+                self.savename = '{}-{}'.format(self.savename, 'BN')
+
+            if warmup:
+                self.savename = '{}-{}'.format(self.savename, 'WU{}'.format(warmup))
+
+            self.savename = '{}-{}'.format(self.savename, datetime.now().strftime('%Y-%m-%dT%H:%M'))
             self.parent_dir = '{}vae-{}'.format(model_path, network)
             self.savepath = '{}vae-{}/{}/'.format(model_path, network, self.savename)
             create_dir(self.savepath)
@@ -129,7 +139,6 @@ class VAE(object):
 
             params = locals()
             params.pop('self')
-            params.pop('sess')
             params.pop('load_from')
             params.pop('optimizer')
 
@@ -159,8 +168,21 @@ class VAE(object):
                 self.log.critical('loading {}/params.json failed!\n{}'.format(self.savepath, e))
                 exit(0)
 
+        if warmup:
+            # Define the callback to change the callback during training
+            def warmup_fn(epoch):
+                # ramping up + const (we start with epoch=0)
+                value = (0 + beta * (epoch / warmup)) * (epoch <= warmup) + \
+                        beta * (epoch > warmup)
+                K.set_value(self.beta, value)
+
+            self.beta = K.variable(value=0)
+            self.beta_cb = LambdaCallback(on_epoch_begin=lambda epoch, log: warmup_fn(epoch))
+        else:
+            self.beta = K.variable(value=beta)
+
         # load network
-        io, models, zs = build_network(self.input_shape, self.latent_dim, network=network)
+        io, models, zs = build_network(self.input_shape, self.latent_dim, self.beta, network=network)
 
         # unpack network
         self.inputs, self.outputs = io
@@ -168,8 +190,8 @@ class VAE(object):
         self.z_mean, self.z_log_var, self.z = zs
 
         # encode, decode functions
-        self.encode = lambda x: np.asarray(self.encoder.predict(x))
-        self.decode = lambda x: np.asarray(self.decoder.predict(x))
+        self.encode = lambda x: np.asarray(self.encoder.predict(x)[:3])
+        self.decode = lambda x: np.asarray(self.decoder.predict([x, np.random.normal(0, 1, (1, 64, 64, 1))])[0])
 
         # make sure that input and output shapes match
         assert self.inputs._keras_shape[1:] == self.outputs._keras_shape[1:], 'shape mismatch: in {} out {}'.format(self.inputs._keras_shape[1:],
@@ -183,24 +205,12 @@ class VAE(object):
         self.log.info('VAE has parameters:')
         print_dict(params, lo=self.log)
 
-        # define recontruction loss
-        re_loss = binary_crossentropy(K.flatten(self.inputs), K.flatten(self.outputs))
-        re_loss *= self.input_shape[1] ** 2  # dont square, use correct dims
-
-        # define kullback leibler divergence
-        self.kl_loss = 1 + self.z_log_var - K.square(self.z_mean) - K.exp(self.z_log_var)
-        self.kl_loss = -0.5 * K.sum(self.kl_loss, axis=-1)
-        self.vae_loss = K.mean(re_loss + self.beta * self.kl_loss)
-
-        # register loss function
-        self.vae.add_loss(self.vae_loss)
-
         # compile entire auto encoder
-        self.vae.compile(optimizer(lr=self.lr), metrics=['accuracy'])
+        self.vae.compile(optimizer(lr=self.lr), metrics=['accuracy'], loss=None)
 
-        csv_header = ['date', '#episode', '#batch']\
+        csv_header = ['date', '#episode', '#batch', 'rec-loss', 'kl-loss',]\
                      + ['mu-{}'.format(i) for i in range(self.latent_dim)]\
-                     + ['sigma-{}'.format(i) for i in range(self.latent_dim)] # todo add losses
+                     + ['sigma-{}'.format(i) for i in range(self.latent_dim)]
         self.csv = CSVLogger('{}/progress.csv'.format(self.savepath), *csv_header)
 
         # log summaries
@@ -239,10 +249,10 @@ class VAE(object):
         # train vae
         start = datetime.now()
 
-        if val is not None:
-            self.vae.fit(data, epochs=num_episodes, batch_size=batch_size, validation_data=(val, None))
-        else:
-            self.vae.fit(data, epochs=num_episodes, batch_size=batch_size, callbacks=[cb])
+        callbacks = [cb]
+        if self.beta_cb: callbacks += [self.beta_cb]
+
+        self.vae.fit(data, epochs=num_episodes, batch_size=batch_size, callbacks=callbacks)
 
         elapsed = datetime.now() - start
         self.log.info('Training took {}.'.format(elapsed))
@@ -269,8 +279,8 @@ if __name__ == '__main__':
 
     # get image size
     shape = (64, 64, 1)
-    (data, _) = load_dsprites('translation', repetitions=10)
+    (data, _) = load_dsprites('translation', repetitions=1)
 
-    v = VAE(load_from='trans')
-    # vae = VAE(input_shape=(64, 64, 1), network='dsprites', name='trans')
-    # vae.train(data[:128], num_episodes=3)
+    # v = VAE(load_from='trans')
+    vae = VAE(input_shape=(64, 64, 1), beta=4.0, network='dsprites', name='trans', warmup=3)
+    vae.train(data[:128], num_episodes=10)
