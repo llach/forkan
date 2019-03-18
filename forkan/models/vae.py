@@ -251,7 +251,7 @@ class VAE(object):
         start = datetime.now()
 
         callbacks = [cb]
-        if self.beta_cb: callbacks += [self.beta_cb]
+        if hasattr(self, 'beta_cb'): callbacks += [self.beta_cb]
 
         self.vae.fit(data, epochs=num_episodes, batch_size=batch_size, callbacks=callbacks)
 
@@ -283,5 +283,5 @@ if __name__ == '__main__':
     (data, _) = load_dsprites('translation', repetitions=1)
 
     # v = VAE(load_from='trans')
-    vae = VAE(input_shape=(64, 64, 1), beta=4.0, network='dsprites', name='trans', warmup=3)
+    vae = VAE(input_shape=(64, 64, 1), beta=4.0, network='dsprites', name='trans')
     vae.train(data[:128], num_episodes=10)
