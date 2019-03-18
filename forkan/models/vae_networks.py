@@ -6,7 +6,7 @@ import keras.backend as K
 from keras import Model
 from keras.metrics import binary_crossentropy
 from keras.initializers import Constant
-from keras.layers import (Conv2D, Conv2DTranspose, Dense, Layer,
+from keras.layers import (Conv2D, Conv2DTranspose, Dense, Layer, BatchNormalization,
                           Input, Lambda, Flatten, Reshape)
 
 logger = logging.getLogger(__name__)
@@ -63,7 +63,8 @@ def _sample(inputs):
     return z_mean + K.exp(0.5 * z_log_var) * epsilon
 
 
-def create_bvae_network(input_shape, latent_dim, beta, encoder_conf, decoder_conf, hiddens=256, initial_bias=0.1):
+def create_bvae_network(input_shape, latent_dim, beta, encoder_conf, decoder_conf,
+                        batch_norm=True, hiddens=256, initial_bias=0.1):
     # define encoder input layer
     vae_input = Input(shape=input_shape)
 
@@ -75,6 +76,8 @@ def create_bvae_network(input_shape, latent_dim, beta, encoder_conf, decoder_con
                    data_format='channels_last', activation='relu',
                    bias_initializer=Constant(initial_bias),
                    name='enc-conv-{}'.format(n))(x)
+        if batch_norm:
+            x = BatchNormalization()(x)
 
     # shape info needed to build decoder model
     conv_shape = K.int_shape(x)
@@ -116,6 +119,9 @@ def create_bvae_network(input_shape, latent_dim, beta, encoder_conf, decoder_con
                    bias_initializer=Constant(initial_bias),
                    name='enc-conv-{}'.format(n))(x)
 
+        if batch_norm:
+            x = BatchNormalization()(x)
+
     # this one is mainly to normalize outputs and reduce depth to the original one
     x_hat = Conv2DTranspose(1, 1, strides=1, padding='same',
                         data_format='channels_last', activation='sigmoid',
@@ -137,7 +143,7 @@ def create_bvae_network(input_shape, latent_dim, beta, encoder_conf, decoder_con
     return (vae_input, x_hat), (encoder, decoder, vae), (z_mean, z_log_var, z)
 
 
-def build_network(input_shape, latent_dim, beta, network='dsprites', initial_bias=0.1):
+def build_network(input_shape, latent_dim, beta, batch_norm=True, network='dsprites', initial_bias=0.1):
     ############################################
     #####               DSPRITES           #####
     ############################################
@@ -171,4 +177,4 @@ def build_network(input_shape, latent_dim, beta, network='dsprites', initial_bia
         sys.exit(1)
 
     return create_bvae_network(input_shape, latent_dim, beta, encoder_conf, decoder_conf,
-                               hiddens=hiddens, initial_bias=initial_bias)
+                               batch_norm=batch_norm, hiddens=hiddens, initial_bias=initial_bias)

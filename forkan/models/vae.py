@@ -182,7 +182,8 @@ class VAE(object):
             self.beta = K.variable(value=beta)
 
         # load network
-        io, models, zs = build_network(self.input_shape, self.latent_dim, self.beta, network=network)
+        io, models, zs = build_network(self.input_shape, self.latent_dim, self.beta,
+                                       batch_norm=batch_norm, network=network)
 
         # unpack network
         self.inputs, self.outputs = io
