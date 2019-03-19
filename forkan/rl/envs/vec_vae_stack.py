@@ -30,11 +30,9 @@ class VecVAEStack(EnvWrapper):
         self.observation_space = spaces.Box(low=-np.infty, high=np.infty, shape=(self.k*self.v.latent_dim,),
                                             dtype=np.float)
 
+        self.vae_name = self.v.savename
         self.queues = [deque(maxlen=self.k) for _ in range(self.nenvs)]
         self._reset_queues()
-
-        self.logger.warning('THIS VERSION INCLUDES SOME HORRIBLE HACKS, SUCH AS A HARDCODED INDEX FOR THE LATENT THAT'
-                            'REPRESENTS THETA. DON\'T USE FOR REAL RESULTS.')
 
     def _reset_queues(self):
         for q in self.queues:
