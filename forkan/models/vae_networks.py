@@ -63,7 +63,7 @@ def _sample(inputs):
 
 
 def create_bvae_network(input_shape, latent_dim, beta, encoder_conf, decoder_conf,
-                        batch_norm=True, hiddens=256, initial_bias=0.1):
+                        batch_norm=False, hiddens=256, initial_bias=0.1):
     # define encoder input layer
     vae_input = Input(shape=input_shape)
 
@@ -142,7 +142,7 @@ def create_bvae_network(input_shape, latent_dim, beta, encoder_conf, decoder_con
     return (vae_input, x_hat), (encoder, decoder, vae), (z_mean, z_log_var, z)
 
 
-def build_network(input_shape, latent_dim, beta, batch_norm=True, network='dsprites', initial_bias=0.1):
+def build_network(input_shape, latent_dim, beta, batch_norm=False, network='dsprites', initial_bias=0.1):
     ############################################
     #####               DSPRITES           #####
     ############################################

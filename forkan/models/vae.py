@@ -74,7 +74,6 @@ class VAE(object):
                  plot_models=False,
                  lr=1e-3,
                  load_from=None,
-                 batch_norm=True,
                  warmup=None,
                  optimizer=optimizers.Adam
                  ):
@@ -119,15 +118,12 @@ class VAE(object):
             self.network = network
             self.name = name
             self.warmup = warmup
-            self.batch_norm = batch_norm
             self.lr = lr
 
             if self.name is None or self.name == '':
                 self.name = 'default'
 
             self.savename = '{}-b{}-lat{}-lr{}'.format(name, beta, latent_dim, lr)
-            if batch_norm:
-                self.savename = '{}-{}'.format(self.savename, 'BN')
 
             if warmup:
                 self.savename = '{}-{}'.format(self.savename, 'WU{}'.format(warmup))
@@ -186,7 +182,7 @@ class VAE(object):
 
         # load network
         io, models, zs = build_network(self.input_shape, self.latent_dim, self.beta_var,
-                                       batch_norm=self.batch_norm, network=network)
+                                       batch_norm=False, network=network)
 
         # unpack network
         self.inputs, self.outputs = io
