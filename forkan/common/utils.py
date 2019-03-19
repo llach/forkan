@@ -82,7 +82,7 @@ def log_alg(name, env_id, params, vae, num_envs=1, save=True):
     else:
         savename = '{}-noVAE-nenv{}-{}'.format(env_id_lower, num_envs, datetime.datetime.now().strftime('%Y-%m-%dT%H:%M'))
 
-    savepath = '{}{}-TEST/{}/'.format(model_path, name, savename)
+    savepath = '{}{}/{}/'.format(model_path, name, savename)
 
     if save: create_dir(savepath)
 
