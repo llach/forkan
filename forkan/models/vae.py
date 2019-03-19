@@ -118,6 +118,8 @@ class VAE(object):
             self.latent_dim = latent_dim
             self.network = network
             self.name = name
+            self.warmup = warmup
+            self.batch_norm = batch_norm
             self.lr = lr
 
             if self.name is None or self.name == '':
@@ -168,22 +170,23 @@ class VAE(object):
                 self.log.critical('loading {}/params.json failed!\n{}'.format(self.savepath, e))
                 exit(0)
 
-        if warmup:
+        if self.warmup:
+
+            self.beta_var = K.variable(value=0)
+            self.beta_cb = LambdaCallback(on_epoch_begin=lambda epoch, log: warmup_fn(epoch))
+
             # Define the callback to change the callback during training
             def warmup_fn(epoch):
                 # ramping up + const (we start with epoch=0)
                 value = (0 + beta * (epoch / warmup)) * (epoch <= warmup) + \
                         beta * (epoch > warmup)
-                K.set_value(self.beta, value)
-
-            self.beta = K.variable(value=0)
-            self.beta_cb = LambdaCallback(on_epoch_begin=lambda epoch, log: warmup_fn(epoch))
+                K.set_value(self.beta_var, value)
         else:
-            self.beta = K.variable(value=beta)
+            self.beta_var = K.variable(value=beta)
 
         # load network
-        io, models, zs = build_network(self.input_shape, self.latent_dim, self.beta,
-                                       batch_norm=batch_norm, network=network)
+        io, models, zs = build_network(self.input_shape, self.latent_dim, self.beta_var,
+                                       batch_norm=self.batch_norm, network=network)
 
         # unpack network
         self.inputs, self.outputs = io
@@ -234,7 +237,7 @@ class VAE(object):
                        show_shapes=True)
 
         self.log.info('(beta) VAE for {} with beta = {} and |z| = {} and learning rate of {}'
-                      .format(self.network, self.beta, self.latent_dim, self.lr))
+                      .format(self.network, self.beta_var, self.latent_dim, self.lr))
 
     def train(self, data, val=None, num_episodes=50, batch_size=128):
         """
@@ -251,7 +254,7 @@ class VAE(object):
         start = datetime.now()
 
         callbacks = [cb]
-        if hasattr(self, 'beta_cb'): callbacks += [self.beta_cb]
+        if self.warmup: callbacks += [self.beta_cb]
 
         self.vae.fit(data, epochs=num_episodes, batch_size=batch_size, callbacks=callbacks)
 

@@ -35,7 +35,6 @@ class KLLossLayer(Layer):
     def call(self, inputs, **kwargs):
         z_mean = inputs[0]
         z_log_var = inputs[1]
-        print('beta, ', self.beta)
 
         kl_loss = 1 + z_log_var - K.square(z_mean) - K.exp(z_log_var)
         kl_loss = -0.5 * K.sum(kl_loss, axis=-1)
