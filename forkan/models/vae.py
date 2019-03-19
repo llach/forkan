@@ -34,6 +34,7 @@ class VAECallback(Callback):
         self.batch += 1
 
     def on_epoch_end(self, epoch, logs=None):
+
         self.m.vae.save_weights('{}/weights.h5'.format(self.m.savepath), overwrite=True)
 
         # log sigmas
@@ -49,6 +50,7 @@ class VAECallback(Callback):
 
             x_hat, rec_loss = self.m.decoder.predict([zs, self.val])
             kl_mean, rec_mean = np.mean(kl), np.mean(rec_loss)
+            beta = K.eval(self.m.beta_var)
 
             self.m.csv.writeline(
                     datetime.now().isoformat(),
@@ -56,6 +58,7 @@ class VAECallback(Callback):
                     self.batch,
                     rec_mean,
                     kl_mean,
+                    beta,
                     *mus,
                     *sigmas,
                 )
@@ -208,7 +211,7 @@ class VAE(object):
         # compile entire auto encoder
         self.vae.compile(optimizer(lr=self.lr), metrics=['accuracy'], loss=None)
 
-        csv_header = ['date', '#episode', '#batch', 'rec-loss', 'kl-loss',]\
+        csv_header = ['date', '#episode', '#batch', 'rec-loss', 'kl-loss', 'beta',]\
                      + ['mu-{}'.format(i) for i in range(self.latent_dim)]\
                      + ['sigma-{}'.format(i) for i in range(self.latent_dim)]
         self.csv = CSVLogger('{}/progress.csv'.format(self.savepath), *csv_header)
@@ -282,5 +285,5 @@ if __name__ == '__main__':
     (data, _) = load_dsprites('translation', repetitions=1)
 
     # v = VAE(load_from='trans')
-    vae = VAE(input_shape=(64, 64, 1), beta=4.0, network='dsprites', name='trans')
+    vae = VAE(input_shape=(64, 64, 1), beta=4.0, network='dsprites', name='trans', warmup=3)
     vae.train(data[:128], num_episodes=10)
