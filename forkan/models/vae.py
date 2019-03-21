@@ -195,6 +195,8 @@ class VAE(object):
         # encode, decode functions
         self.encode = lambda x: np.asarray(self.encoder.predict(x)[:3])
         self.decode = lambda x: np.asarray(self.decoder.predict([x, np.random.normal(0, 1, (1, 64, 64, 1))])[0])
+        self.full_decode = lambda x, y: np.asarray(self.decoder.predict([x, y])[0])
+        self.full_forward = lambda x: np.asarray(self.vae.predict(x), dtype=np.float32)
 
         # make sure that input and output shapes match
         assert self.inputs._keras_shape[1:] == self.outputs._keras_shape[1:], 'shape mismatch: in {} out {}'.format(self.inputs._keras_shape[1:],
