@@ -13,7 +13,6 @@ class VAEStack(EnvWrapper):
 
     def __init__(self,
                  env,
-                 load_from,
                  k=3,
                  vae_network='pendulum',
                  **kwargs,
@@ -23,6 +22,11 @@ class VAEStack(EnvWrapper):
 
         # inheriting from EnvWrapper and passing it an env makes spaces available.
         super().__init__(env)
+
+        load_from = 'pendvisualuniform-b20-lat5-lr0.001-2019-03-18T20/16'.replace('/', ':')
+        self.idxes = [0, 1]
+        # load_from = 'pendvisualuniform-b22-lat5-lr0.001-2019-03-18T20/23'.replace('/', ':')
+        # self.idxes = [2, 3]
 
         self.k = k
         self.v = VAE(load_from=load_from, network=vae_network)
@@ -41,8 +45,8 @@ class VAEStack(EnvWrapper):
 
     def _process(self, obs):
         mus, _, _ = self.v.encode(np.expand_dims(obs, 0))
-        self.q.appendleft(mus[0][2])
-        self.q.appendleft(mus[0][3])
+        self.q.appendleft(mus[0][self.idxes[0]])
+        self.q.appendleft(mus[0][self.idxes[1]])
 
     def _get_obs(self):
         return np.asarray(self.q)
