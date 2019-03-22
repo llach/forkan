@@ -13,8 +13,8 @@ class VAEStack(EnvWrapper):
 
     def __init__(self,
                  env,
+                 load_from,
                  k=3,
-                 load_from='pend-optimal',
                  vae_network='pendulum',
                  **kwargs,
                  ):
@@ -41,7 +41,7 @@ class VAEStack(EnvWrapper):
 
     def _process(self, obs):
         mus, _, _ = self.v.encode(np.expand_dims(obs, 0))
-        self.q.appendleft(mus[0][0])
+        self.q.appendleft(mus[0][2])
         self.q.appendleft(mus[0][3])
 
     def _get_obs(self):
