@@ -34,6 +34,8 @@ class VecVAEStack(EnvWrapper):
         self.queues = [deque(maxlen=self.k) for _ in range(self.nenvs)]
         self._reset_queues()
 
+        print('WARNING, WE NEED TO MOVEAXIS INSTEAD OF RESHAPING!! DONT USE!!!')
+
     def _reset_queues(self):
         for q in self.queues:
             for _ in range(self.k):
