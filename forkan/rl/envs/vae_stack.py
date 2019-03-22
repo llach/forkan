@@ -45,7 +45,7 @@ class VAEStack(EnvWrapper):
         self.q.appendleft(mus[0][2])
 
     def _get_obs(self):
-        return np.asarray(self.q).flatten()
+        return np.asarray(self.q)
 
     def step(self, action):
         obs, reward, done, info = self.env.step(action)
