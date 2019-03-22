@@ -26,20 +26,23 @@ class VAEStack(EnvWrapper):
 
         self.k = k
         self.v = VAE(load_from=load_from, network=vae_network)
-        self.observation_space = spaces.Box(low=-np.infty, high=np.infty, shape=(self.k*self.v.latent_dim,),
+        self.observation_space = spaces.Box(low=-np.infty, high=np.infty, shape=(2*self.k,),
                                             dtype=np.float)
 
+        self.logger.warning('THIS VERSION IS USING HARDCODED INDICES, BE AWARE!')
+
         self.vae_name = self.v.savename
-        self.q = deque(maxlen=self.k)
+        self.q = deque(maxlen=2*self.k)
         self._reset_queue()
 
     def _reset_queue(self):
-        for _ in range(self.k):
-            self.q.appendleft(np.asarray([0]*self.v.latent_dim, dtype=np.float32))
+        for _ in range(2*self.k):
+            self.q.appendleft(0)
 
     def _process(self, obs):
         mus, _, _ = self.v.encode(np.expand_dims(obs, 0))
-        self.q.appendleft(np.squeeze(mus))
+        self.q.appendleft(mus[0][0])
+        self.q.appendleft(mus[0][2])
 
     def _get_obs(self):
         return np.asarray(self.q).flatten()
