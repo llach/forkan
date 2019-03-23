@@ -70,7 +70,7 @@ def print_dict(d, lo=None):
     lo.info('}')
 
 
-def log_alg(name, env_id, params, vae, num_envs=1, save=True):
+def log_alg(name, env_id, params, vae, num_envs=1, save=True, lr=None):
     params.update({'nenvs': num_envs})
 
     print_dict(params)
@@ -78,9 +78,14 @@ def log_alg(name, env_id, params, vae, num_envs=1, save=True):
     env_id_lower = env_id.replace('NoFrameskip', '').lower().split('-')[0]
 
     if vae is not None and vae is not '':
-        savename = '{}-{}-nenv{}-{}'.format(env_id_lower, vae, num_envs, datetime.datetime.now().strftime('%Y-%m-%dT%H:%M'))
+        savename = '{}-{}-nenv{}'.format(env_id_lower, vae, num_envs)
     else:
-        savename = '{}-noVAE-nenv{}-{}'.format(env_id_lower, num_envs, datetime.datetime.now().strftime('%Y-%m-%dT%H:%M'))
+        savename = '{}-noVAE-nenv{}'.format(env_id_lower, num_envs)
+
+    if lr is not None:
+        savename = '{}-lr{}'.format(savename, lr)
+
+    savename = '{}-{}'.format(savename, datetime.datetime.now().strftime('%Y-%m-%dT%H:%M'))
 
     savepath = '{}{}/{}/'.format(model_path, name, savename)
 
