@@ -23,10 +23,8 @@ class VAEStack(EnvWrapper):
         # inheriting from EnvWrapper and passing it an env makes spaces available.
         super().__init__(env)
 
-        load_from = 'pendvisualuniform-b20-lat5-lr0.001-2019-03-18T20/16'.replace('/', ':')
-        self.idxes = [0, 1]
-        # load_from = 'pendvisualuniform-b22-lat5-lr0.001-2019-03-18T20/23'.replace('/', ':')
-        # self.idxes = [2, 3]
+        load_from = 'pendvisualuniform-b77.5-lat5-lr0.001-2019-03-21T00/13'.replace('/', ':')
+        self.idxes = [3, 4]
 
         self.k = k
         self.v = VAE(load_from=load_from, network=vae_network)
