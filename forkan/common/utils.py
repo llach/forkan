@@ -70,7 +70,7 @@ def print_dict(d, lo=None):
     lo.info('}')
 
 
-def log_alg(name, env_id, params, vae, num_envs=1, save=True, lr=None):
+def log_alg(name, env_id, params, vae=None, num_envs=1, save=True, lr=None):
     params.update({'nenvs': num_envs})
 
     print_dict(params)
