@@ -207,6 +207,11 @@ class VAE(object):
             self.vae.load_weights('{}/weights.h5'.format(self.savepath))
             self.log.info('done!')
 
+            self.log.info('diabeling VAE training ')
+            for mo in [self.vae, self.encoder, self.decoder]:
+                for l in mo.layers:
+                    l.trainable = False
+
         self.log.info('VAE has parameters:')
         print_dict(params, lo=self.log)
 

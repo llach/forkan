@@ -116,7 +116,7 @@ def create_bvae_network(input_shape, latent_dim, beta, encoder_conf, decoder_con
         x = Conv2DTranspose(filters, kernel_size, strides=stride, padding='same',
                    data_format='channels_last', activation='relu',
                    bias_initializer=Constant(initial_bias),
-                   name='enc-conv-{}'.format(n))(x)
+                   name='dec-conv-{}'.format(n))(x)
 
         if batch_norm:
             x = BatchNormalization()(x)
