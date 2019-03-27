@@ -82,7 +82,7 @@ def log_alg(name, env_id, params, vae=None, num_envs=1, save=True, lr=None):
     else:
         savename = '{}-noVAE-nenv{}'.format(env_id_lower, num_envs)
 
-    if lr is not None:
+    if lr is not None and not callable(lr):
         savename = '{}-lr{}'.format(savename, lr)
 
     savename = '{}-{}'.format(savename, datetime.datetime.now().strftime('%Y-%m-%dT%H:%M'))
@@ -92,9 +92,16 @@ def log_alg(name, env_id, params, vae=None, num_envs=1, save=True, lr=None):
     if save: create_dir(savepath)
 
     # clean params form non-serializable objects
-    for par in ['env', 'params']:
+    for par in ['env', 'params', 'epinfobuf', 'model_fn', 'runner', 'Model', 'model', 'ac_space', 'ob_space']:
         if par in params.keys():
             params.pop(par)
+
+    func_keys = []
+    for key, value in params.items():
+        if callable(value):
+            func_keys.append(key)
+    for fk in func_keys:
+        params.pop(fk)
 
     if save:
         # store from file anyways
