@@ -70,7 +70,7 @@ def print_dict(d, lo=None):
     lo.info('}')
 
 
-def log_alg(name, env_id, params, vae=None, num_envs=1, save=True, lr=None):
+def log_alg(name, env_id, params, vae=None, num_envs=1, save=True, lr=None, k=None):
     params.update({'nenvs': num_envs})
 
     print_dict(params)
@@ -85,6 +85,9 @@ def log_alg(name, env_id, params, vae=None, num_envs=1, save=True, lr=None):
     if lr is not None and not callable(lr):
         savename = '{}-lr{}'.format(savename, lr)
 
+    if k is not None and not callable(k):
+        savename = '{}-k{}'.format(savename, k)
+        
     savename = '{}-{}'.format(savename, datetime.datetime.now().strftime('%Y-%m-%dT%H:%M'))
 
     savepath = '{}{}/{}/'.format(model_path, name, savename)
