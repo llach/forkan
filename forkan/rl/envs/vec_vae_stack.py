@@ -19,7 +19,7 @@ class VecVAEStack(object):
         self.logger = logging.getLogger(__name__)
 
         self.env = env
-        self.nenvs = self.env.num_envs
+        self.num_envs = self.env.num_envs
 
         self.k = k
         self.v = VAE(load_from=load_from, network=vae_network)
@@ -28,7 +28,7 @@ class VecVAEStack(object):
         self.observation_space = spaces.Box(low=-2, high=2, shape=(self.k*self.v.latent_dim, ), dtype=np.float32)
 
         self.vae_name = self.v.savename
-        self.queues = [deque(maxlen=self.k) for _ in range(self.nenvs)]
+        self.queues = [deque(maxlen=self.k) for _ in range(self.num_envs)]
         self._reset_queues()
 
     def _reset_queues(self):
@@ -38,11 +38,11 @@ class VecVAEStack(object):
 
     def _process(self, obs):
         mus, _, _ = self.v.encode(obs)
-        for i in range(self.nenvs):
+        for i in range(self.num_envs):
             self.queues[i].appendleft(mus[i])
 
     def _get_obs(self):
-        return np.asarray(self.queues).reshape([self.nenvs, -1])
+        return np.asarray(self.queues).reshape([self.num_envs, -1])
 
     def step(self, action):
         obs, reward, done, info = self.env.step(action)
