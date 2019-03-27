@@ -1,15 +1,12 @@
 import logging
 import numpy as np
-
+from gym import spaces
 from collections import deque
 
 from forkan.models import VAE
 
-from gym import spaces
-from forkan.rl import EnvWrapper
 
-
-class VecVAEStack(EnvWrapper):
+class VecVAEStack(object):
 
     def __init__(self,
                  env,
@@ -21,14 +18,14 @@ class VecVAEStack(EnvWrapper):
 
         self.logger = logging.getLogger(__name__)
 
-        # inheriting from EnvWrapper and passing it an env makes spaces available.
-        super().__init__(env)
-        self.nenvs = self.num_envs
+        self.env = env
+        self.nenvs = self.env.num_envs
 
         self.k = k
         self.v = VAE(load_from=load_from, network=vae_network)
-        self.observation_space = spaces.Box(low=-np.infty, high=np.infty, shape=(self.k*self.v.latent_dim,),
-                                            dtype=np.float)
+
+        self.action_space = env.action_space
+        self.observation_space = spaces.Box(low=-2, high=2, shape=(self.k*self.v.latent_dim, ), dtype=np.float32)
 
         self.vae_name = self.v.savename
         self.queues = [deque(maxlen=self.k) for _ in range(self.nenvs)]
