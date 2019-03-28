@@ -64,8 +64,9 @@ def _sample(inputs):
 
 def create_bvae_network(input_shape, latent_dim, beta, encoder_conf, decoder_conf,
                         batch_norm=False, hiddens=256, initial_bias=0.1):
+
     # define encoder input layer
-    vae_input = Input(shape=input_shape)
+    vae_input = Input(shape=input_shape, name='encoder-input')
 
     x = vae_input
     for n, (filters, kernel_size, stride) in enumerate(encoder_conf):
@@ -87,8 +88,8 @@ def create_bvae_network(input_shape, latent_dim, beta, encoder_conf, decoder_con
 
     # latent variables means and log(variance)s
     # leave the z activations linear!
-    z_mean = Dense(latent_dim)(x)
-    z_log_var = Dense(latent_dim)(x)
+    z_mean = Dense(latent_dim, name='mean')(x)
+    z_log_var = Dense(latent_dim, name='logvar')(x)
     z = Lambda(_sample, output_shape=(latent_dim,), name='z')([z_mean, z_log_var])
 
     # we define the individual loss compnents as layers so we can log them in callbacks
@@ -98,7 +99,7 @@ def create_bvae_network(input_shape, latent_dim, beta, encoder_conf, decoder_con
     encoder = Model(vae_input, [z_mean, z_log_var, z, y_kl], name='encoder')
 
     # define decoder input layer
-    de_inputs = Input(shape=(latent_dim,))
+    de_inputs = Input(shape=(latent_dim,), name='decoder-input')
 
     # prepare decoder
     # this part is not explicitly given in the paper. it reads just 'reverse order'
