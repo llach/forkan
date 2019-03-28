@@ -78,7 +78,8 @@ class VAE(object):
                  lr=1e-3,
                  load_from=None,
                  warmup=None,
-                 optimizer=optimizers.Adam
+                 optimizer=optimizers.Adam,
+                 sess=None,
                  ):
         """
 
@@ -106,6 +107,9 @@ class VAE(object):
         """
 
         self.log = logging.getLogger('vae')
+
+        if sess is not None:
+            K.set_session(sess)
 
         # some metadata for weight file names
         self.name = name
@@ -169,54 +173,57 @@ class VAE(object):
                 self.log.critical('loading {}/params.json failed!\n{}'.format(self.savepath, e))
                 exit(0)
 
-        if self.warmup:
+        with K.get_session().graph.as_default() as g:
+            with g.name_scope('vae') as scope:
+                # print(f'keras graph {g}')
+                if self.warmup:
 
-            self.beta_var = K.variable(value=0)
-            self.beta_cb = LambdaCallback(on_epoch_begin=lambda epoch, log: warmup_fn(epoch))
+                    self.beta_var = K.variable(value=0)
+                    self.beta_cb = LambdaCallback(on_epoch_begin=lambda epoch, log: warmup_fn(epoch))
 
-            # Define the callback to change the callback during training
-            def warmup_fn(epoch):
-                # ramping up + const (we start with epoch=0)
-                value = (0 + beta * (epoch / warmup)) * (epoch <= warmup) + \
-                        beta * (epoch > warmup)
-                K.set_value(self.beta_var, value)
-        else:
-            self.beta_var = K.variable(value=beta)
+                    # Define the callback to change the callback during training
+                    def warmup_fn(epoch):
+                        # ramping up + const (we start with epoch=0)
+                        value = (0 + beta * (epoch / warmup)) * (epoch <= warmup) + \
+                                beta * (epoch > warmup)
+                        K.set_value(self.beta_var, value)
+                else:
+                    self.beta_var = K.variable(value=beta)
 
-        # load network
-        io, models, zs = build_network(self.input_shape, self.latent_dim, self.beta_var,
-                                       batch_norm=False, network=network)
+                # load network
+                io, models, zs = build_network(self.input_shape, self.latent_dim, self.beta_var,
+                                               batch_norm=False, network=network)
 
-        # unpack network
-        self.inputs, self.outputs = io
-        self.encoder, self.decoder, self.vae = models
-        self.z_mean, self.z_log_var, self.z = zs
+                # unpack network
+                self.inputs, self.outputs = io
+                self.encoder, self.decoder, self.vae = models
+                self.z_mean, self.z_log_var, self.z = zs
 
-        # encode, decode functions
-        self.encode = lambda x: np.asarray(self.encoder.predict(x)[:3])
-        self.decode = lambda x: np.asarray(self.decoder.predict([x, np.random.normal(0, 1, (1, 64, 64, 1))])[0])
-        self.full_decode = lambda x, y: np.asarray(self.decoder.predict([x, y])[0])
-        self.full_forward = lambda x: np.asarray(self.vae.predict(x), dtype=np.float32)
+                self.encode = lambda x: np.asarray(self.encoder.predict(x)[:3])
+                self.decode = lambda x: np.asarray(self.decoder.predict([x, np.random.normal(0, 1, (1, 64, 64, 1))])[0])
+                self.full_decode = lambda x, y: np.asarray(self.decoder.predict([x, y])[0])
+                self.full_forward = lambda x: np.asarray(self.vae.predict(x), dtype=np.float32)
 
-        # make sure that input and output shapes match
-        assert self.inputs._keras_shape[1:] == self.outputs._keras_shape[1:], 'shape mismatch: in {} out {}'.format(self.inputs._keras_shape[1:],
-                                                                                                                    self.outputs._keras_shape[1:])
+                # make sure that input and output shapes match
+                assert self.inputs._keras_shape[1:] == self.outputs._keras_shape[1:], 'shape mismatch: in {} out {}'.format(self.inputs._keras_shape[1:],
+                                                                                                                            self.outputs._keras_shape[1:])
 
-        if load_from is not None:
-            self.log.info('restoring graph ... ')
-            self.vae.load_weights('{}/weights.h5'.format(self.savepath))
-            self.log.info('done!')
+                if load_from is not None:
+                    self.log.info('restoring graph ... ')
+                    self.vae.load_weights('{}/weights.h5'.format(self.savepath))
+                    self.log.info('done!')
 
-            self.log.info('diabeling VAE training ')
-            for mo in [self.vae, self.encoder, self.decoder]:
-                for l in mo.layers:
-                    l.trainable = False
+                    self.log.info('diabeling VAE training ')
+                    for mo in [self.vae, self.encoder, self.decoder]:
+                        for l in mo.layers:
+                            l.trainable = False
+                        # compile entire auto encoder
+
+                self.vae.compile(optimizer(lr=self.lr), metrics=['accuracy'], loss=None)
 
         self.log.info('VAE has parameters:')
         print_dict(params, lo=self.log)
 
-        # compile entire auto encoder
-        self.vae.compile(optimizer(lr=self.lr), metrics=['accuracy'], loss=None)
 
         csv_header = ['date', '#episode', '#batch', 'rec-loss', 'kl-loss', 'beta',]\
                      + ['mu-{}'.format(i) for i in range(self.latent_dim)]\
@@ -244,6 +251,8 @@ class VAE(object):
 
         self.log.info('(beta) VAE for {} with beta = {} and |z| = {} and learning rate of {}'
                       .format(self.network, self.beta_var, self.latent_dim, self.lr))
+
+        print(f'keras session {K.get_session()}')
 
     def train(self, data, val=None, num_episodes=50, batch_size=128):
         """
