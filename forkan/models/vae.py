@@ -3,7 +3,7 @@ import json
 import numpy as np
 import tensorflow as tf
 
-from keras import backend as K
+import tensorflow.keras.backend as K
 
 import logging
 import datetime
@@ -275,7 +275,7 @@ class VAE(object):
 
                     hrs = int(min2go // 60)
                     mins = int(min2go) % 60
-                    self.log.info('ETA: {}h {}min | done {}% '.format(hrs, mins, int(perc)))
+                    # self.log.info('ETA: {}h {}min | done {}% '.format(hrs, mins, int(perc)))
 
                     tab = tabulate([
                         ['name', f'{self.name}-b{self.beta}'],
@@ -283,7 +283,9 @@ class VAE(object):
                         ['batch', n],
                         ['bps', bps],
                         ['rec-loss', re_loss],
-                        ['kl-loss', kl_loss]
+                        ['kl-loss', kl_loss],
+                        ['ETA', '{}h {}min'.format(hrs, mins)],
+                        ['done', '{}%'.format(int(perc))],
                     ])
 
                     print('\n{}'.format(tab))
