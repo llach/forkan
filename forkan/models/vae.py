@@ -286,7 +286,7 @@ class VAE(object):
                         ['batch', n],
                         ['bps', bps],
                         ['loss', loss],
-                        ['dkl_loss', kl_loss]
+                        ['dkl_loss', np.mean(kl_loss)]
                     ])
 
                     print('\n{}'.format(tab))
