@@ -282,7 +282,7 @@ class VAE(object):
                     self.log.info('ETA: {}h {}min | done {}% '.format(hrs, mins, int(perc)))
 
                     tab = tabulate([
-                        ['name', self.name],
+                        ['name', f'{self.name}-{self.beta}'],
                         ['episode', ep],
                         ['batch', n],
                         ['bps', bps],
