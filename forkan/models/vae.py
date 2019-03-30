@@ -21,7 +21,7 @@ from forkan.models.vae_networks import build_network
 class VAE(object):
 
     def __init__(self, input_shape=None, name='default', network='atari', latent_dim=20, beta=5.5, lr=1e-4,
-                 load_from=None, sess=None, optimizer=tf.train.AdamOptimizer, tensorboard=True):
+                 load_from=None, sess=None, optimizer=tf.train.AdamOptimizer, tensorboard=False):
 
         if input_shape is None:
             assert load_from is not None, 'input shape need to be given if no model is loaded'
@@ -132,8 +132,8 @@ class VAE(object):
         print_dict(params, lo=self.log)
 
         if self.tb:
-            # self._tensorboard_setup()
-            pass
+            self._tensorboard_setup()
+            # pass
         csv_header = ['date', '#episode', '#batch', 'loss', 'kl-loss'] + \
                      ['z{}-kl'.format(i) for i in range(self.latent_dim)]
         self.csv = CSVLogger('{}/progress.csv'.format(self.savepath), *csv_header)
@@ -261,7 +261,7 @@ class VAE(object):
                                                                   feed_dict={self._input: x, self.bps_ph: bps,
                                                                              self.ep_ph: ep})
                 else:
-                    _, loss = self.s.run([self.train_op, self.vae_loss],
+                    _, loss, kl_loss = self.s.run([self.train_op, self.vae_loss, self.kl_loss],
                                                          feed_dict={self._input: x})
 
                 # increase batch counter
@@ -276,7 +276,7 @@ class VAE(object):
                         nb,
                         loss,
                         kl_loss,
-                        *[z for z in zi_kl]
+                        # *[z for z in zi_kl]
                     )
 
                 if n % print_freq == 0 and print_freq is not -1:
