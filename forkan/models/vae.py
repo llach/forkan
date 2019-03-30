@@ -20,7 +20,7 @@ from forkan.models.vae_networks import build_network
 class VAE(object):
 
     def __init__(self, input_shape=None, name='default', network='atari', latent_dim=20, beta=5.5, lr=1e-4,
-                 load_from=None, sess=None, optimizer=tf.train.AdamOptimizer, tensorboard=False):
+                 load_from=None, session=None, optimizer=tf.train.AdamOptimizer, tensorboard=False):
 
         if input_shape is None:
             assert load_from is not None, 'input shape need to be given if no model is loaded'
@@ -53,6 +53,7 @@ class VAE(object):
             params = locals()
             params.pop('self')
             params.pop('optimizer')
+            params.pop('session')
 
             with open('{}/params.json'.format(self.savepath), 'w') as outfile:
                 json.dump(params, outfile)
@@ -105,7 +106,7 @@ class VAE(object):
         self.train_op = optimizer(learning_rate=self.lr).minimize(self.vae_loss)
 
         """ TF setup """
-        self.s = tf.Session() or sess
+        self.s = tf.Session() or session
         tf.global_variables_initializer().run(session=self.s)
 
         # Saver objects handles writing and reading protobuf weight files
