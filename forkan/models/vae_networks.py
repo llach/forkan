@@ -108,4 +108,5 @@ def build_network(x, x_shape, latent_dim=10, network_type='atari'):
         log.critical('network \'{}\' unknown'.format(network_type))
         exit(1)
 
-    return _build_conv(x, x_shape, rec_shape, latent_dim, network_type, encoder_conf, decoder_conf, hiddens)
+    with tf.variable_scope('vae'):
+        return _build_conv(x, x_shape, rec_shape, latent_dim, network_type, encoder_conf, decoder_conf, hiddens)
