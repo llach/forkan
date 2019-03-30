@@ -94,16 +94,6 @@ class VAE(object):
         """ Loss """
         # Loss
         # Reconstruction loss
-        # Minimize the cross-entropy loss
-        # # H(x, x_hat) = -\Sigma x*log(x_hat) + (1-x)*log(1-x_hat)
-        # recon_loss = K.binary_crossentropy(K.flatten(self._input), K.flatten(self._output))
-        # self.reconstruction_loss = recon_loss * np.prod(input_shape)
-        #
-        # self.zi_kl = -0.5 * tf.reduce_sum(1 + self.logvars - tf.square(self.mus) - tf.exp(self.logvars), axis=1)
-        # self.d_kl = tf.reduce_mean(self.zi_kl)
-        #
-        # self.total_loss = tf.reduce_mean(self.reconstruction_loss + self.beta * self.d_kl)
-
         self.re_loss = K.binary_crossentropy(K.flatten(self._input), K.flatten(self._output))
         self.re_loss *= self.input_shape[1] ** 2  # dont square, use correct dims
 
@@ -111,7 +101,6 @@ class VAE(object):
         self.kl_loss = 1 + self.logvars - K.square(self.mus) - K.exp(self.logvars)
         self.kl_loss = -0.5 * K.sum(self.kl_loss, axis=-1)
         self.vae_loss = K.mean(self.re_loss + self.beta * K.mean(self.kl_loss))
-        # self.vae_loss = K.mean(self.re_loss)
 
         # create optimizer
         self.train_op = optimizer(learning_rate=self.lr).minimize(self.vae_loss)
@@ -134,8 +123,8 @@ class VAE(object):
         if self.tb:
             self._tensorboard_setup()
             # pass
-        csv_header = ['date', '#episode', '#batch', 'loss', 'kl-loss'] + \
-                     ['z{}-kl'.format(i) for i in range(self.latent_dim)]
+        csv_header = ['date', '#episode', '#batch', 'loss', 'kl-loss'] #+ \
+                     # ['z{}-kl'.format(i) for i in range(self.latent_dim)]
         self.csv = CSVLogger('{}/progress.csv'.format(self.savepath), *csv_header)
 
     def __del__(self):
@@ -247,12 +236,12 @@ class VAE(object):
         nb = 1
 
         # rollout N episodes
-        for ep in tqdm(range(num_episodes)):
+        for ep in range(num_episodes):
 
             # shuffle dataset
             np.random.shuffle(dataset)
 
-            for n, idx in enumerate(tqdm(np.arange(0, num_samples, batch_size))):
+            for n, idx in enumerate(np.arange(0, num_samples, batch_size)):
                 bps = int(nb / (time.time() - tstart))
                 x = dataset[idx:min(idx+batch_size, num_samples), ...]
                 if self.tb:
@@ -270,23 +259,35 @@ class VAE(object):
                 # write statistics
                 if self.tb:
                     self.writer.add_summary(sum, nb)
-                    self.csv.writeline(
-                        datetime.datetime.now().isoformat(),
-                        ep,
-                        nb,
-                        loss,
-                        kl_loss,
-                        # *[z for z in zi_kl]
-                    )
+                self.csv.writeline(
+                    datetime.datetime.now().isoformat(),
+                    ep,
+                    nb,
+                    loss,
+                    kl_loss,
+                    # *[z for z in zi_kl]
+                )
 
                 if n % print_freq == 0 and print_freq is not -1:
+
+                    total_batches = (num_samples // batch_size) * num_episodes
+
+                    perc = ((nb) / total_batches) * 100
+                    steps2go = total_batches - nb
+                    secs2go = steps2go / bps
+                    min2go = secs2go / 60
+
+                    hrs = int(min2go // 60)
+                    mins = int(min2go) % 60
+                    self.log.info('ETA: {}h {}min | done {}% '.format(hrs, mins, int(perc)))
+
                     tab = tabulate([
                         ['name', self.name],
                         ['episode', ep],
                         ['batch', n],
                         ['bps', bps],
-                        ['loss', loss],
-                        ['dkl_loss', np.mean(kl_loss)]
+                        ['rec-loss', loss],
+                        ['kl-loss', np.mean(kl_loss)]
                     ])
 
                     print('\n{}'.format(tab))
