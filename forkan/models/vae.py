@@ -132,7 +132,8 @@ class VAE(object):
         print_dict(params, lo=self.log)
 
         if self.tb:
-            self._tensorboard_setup()
+            # self._tensorboard_setup()
+            pass
         csv_header = ['date', '#episode', '#batch', 'loss', 'kl-loss'] + \
                      ['z{}-kl'.format(i) for i in range(self.latent_dim)]
         self.csv = CSVLogger('{}/progress.csv'.format(self.savepath), *csv_header)
