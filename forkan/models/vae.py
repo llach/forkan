@@ -21,7 +21,7 @@ from forkan.models.vae_networks import build_network
 class VAE(object):
 
     def __init__(self, input_shape=None, name='default', network='atari', latent_dim=20, beta=5.5, lr=1e-4,
-                 load_from=None, sess=None, optimizer=tf.train.AdamOptimizer, tensorboard=False):
+                 load_from=None, sess=None, optimizer=tf.train.AdamOptimizer, tensorboard=True):
 
         if input_shape is None:
             assert load_from is not None, 'input shape need to be given if no model is loaded'
@@ -285,7 +285,7 @@ class VAE(object):
                         ['batch', n],
                         ['bps', bps],
                         ['loss', loss],
-                        ['dkl_loss', 0]
+                        ['dkl_loss', kl_loss]
                     ])
 
                     print('\n{}'.format(tab))
