@@ -8,7 +8,6 @@ from keras import backend as K
 import logging
 import datetime
 
-from tqdm import tqdm
 from tabulate import tabulate
 
 from forkan import model_path
@@ -122,9 +121,8 @@ class VAE(object):
 
         if self.tb:
             self._tensorboard_setup()
-            # pass
-        csv_header = ['date', '#episode', '#batch', 'loss', 'kl-loss'] #+ \
-                     # ['z{}-kl'.format(i) for i in range(self.latent_dim)]
+
+        csv_header = ['date', '#episode', '#batch', 'rec-loss', 'kl-loss']
         self.csv = CSVLogger('{}/progress.csv'.format(self.savepath), *csv_header)
 
     def __del__(self):
@@ -153,14 +151,9 @@ class VAE(object):
         vars_mean = tf.reduce_mean(tf.exp(0.5 * self.logvars), axis=0)
 
         with tf.variable_scope('loss'):
-            scalar_summary('scaled_kl', self.scaled_kl)
-            scalar_summary('reconstruction-loss', self.reconstruction_loss)
-            scalar_summary('total-loss', self.total_loss)
-            scalar_summary('mean-dkl', self.dkl_loss)
-
-        with tf.variable_scope('zj_kl'):
-            for i in range(self.latent_dim):
-                scalar_summary('z{}-kl'.format(i), self.mean_kl_j[i])
+            scalar_summary('reconstruction-loss', self.re_loss)
+            scalar_summary('total-loss', self.vae_loss)
+            scalar_summary('kl-loss', self.kl_loss)
 
         with tf.variable_scope('zj_mu'):
             for i in range(self.latent_dim):
@@ -245,27 +238,30 @@ class VAE(object):
                 bps = int(nb / (time.time() - tstart))
                 x = dataset[idx:min(idx+batch_size, num_samples), ...]
                 if self.tb:
-                    sum, _, loss, kl_loss, zi_kl = self.s.run([self.merge_op, self.train_op, self.total_loss,
-                                                                   self.dkl_loss, self.mean_kl_j],
-                                                                  feed_dict={self._input: x, self.bps_ph: bps,
-                                                                             self.ep_ph: ep})
+                    _, suma, loss, re_loss, kl_loss = self.s.run([self.train_op, self.merge_op, self.vae_loss,
+                                                               self.re_loss, self.kl_loss],
+                                                              feed_dict={self._input: x,
+                                                                         self.bps_ph: bps,
+                                                                         self.ep_ph: ep
+                                                                         })
+                    self.writer.add_summary(suma, nb)
                 else:
-                    _, loss, kl_loss = self.s.run([self.train_op, self.vae_loss, self.kl_loss],
+                    _, loss, re_loss, kl_loss = self.s.run([self.train_op, self.vae_loss, self.re_loss, self.kl_loss],
                                                          feed_dict={self._input: x})
+
+                # mean losses
+                re_loss = np.mean(re_loss)
+                kl_loss = np.mean(kl_loss)
 
                 # increase batch counter
                 nb += 1
 
-                # write statistics
-                if self.tb:
-                    self.writer.add_summary(sum, nb)
                 self.csv.writeline(
                     datetime.datetime.now().isoformat(),
                     ep,
                     nb,
-                    loss,
+                    re_loss,
                     kl_loss,
-                    # *[z for z in zi_kl]
                 )
 
                 if n % print_freq == 0 and print_freq is not -1:
@@ -282,12 +278,12 @@ class VAE(object):
                     self.log.info('ETA: {}h {}min | done {}% '.format(hrs, mins, int(perc)))
 
                     tab = tabulate([
-                        ['name', f'{self.name}-{self.beta}'],
+                        ['name', f'{self.name}-b{self.beta}'],
                         ['episode', ep],
                         ['batch', n],
                         ['bps', bps],
-                        ['rec-loss', loss],
-                        ['kl-loss', np.mean(kl_loss)]
+                        ['rec-loss', re_loss],
+                        ['kl-loss', kl_loss]
                     ])
 
                     print('\n{}'.format(tab))
