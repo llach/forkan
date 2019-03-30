@@ -90,7 +90,7 @@ def build_network(x, x_shape, latent_dim=10, network_type='atari'):
                            [(2, 2), (2, 2)]) # strides
 
         hiddens = 512
-    elif network_type == 'dsprites':
+    elif network_type == 'dsprites' or network_type == 'pendulum':
         # this must not depend on input tensor, otherwise the decoder graph
         # could not be run independently form the encoder
         rec_shape = (-1, int(x_shape[1] / 16), int(x_shape[2] / 16), 64)
@@ -105,7 +105,7 @@ def build_network(x, x_shape, latent_dim=10, network_type='atari'):
 
         hiddens = 256
     else:
-        log.cirical('network \'{}\' unknown'.format(network_type))
+        log.critical('network \'{}\' unknown'.format(network_type))
         exit(1)
 
     return _build_conv(x, x_shape, rec_shape, latent_dim, network_type, encoder_conf, decoder_conf, hiddens)

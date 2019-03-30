@@ -45,8 +45,8 @@ class VAE(object):
 
             self.savename = '{}-b{}-lat{}-lr{}-{}'.format(name, beta, latent_dim, lr,
                                                           datetime.datetime.now().strftime('%Y-%m-%dT%H:%M'))
-            self.parent_dir = '{}vae-{}'.format(model_path, network)
-            self.savepath = '{}vae-{}/{}/'.format(model_path, network, self.savename)
+            self.parent_dir = '{}TFvae-{}'.format(model_path, network)
+            self.savepath = '{}TFvae-{}/{}/'.format(model_path, network, self.savename)
             create_dir(self.savepath)
 
             self.log.info('storing files under {}'.format(self.savepath))
@@ -60,8 +60,8 @@ class VAE(object):
         else: # load old parameter
 
             self.savename = load_from
-            self.parent_dir = '{}vae-{}'.format(model_path, network)
-            self.savepath = '{}vae-{}/{}/'.format(model_path, network, self.savename)
+            self.parent_dir = '{}TFvae-{}'.format(model_path, network)
+            self.savepath = '{}TFvae-{}/{}/'.format(model_path, network, self.savename)
 
             self.log.info('loading model and parameters from {}'.format(self.savepath))
 
@@ -269,14 +269,14 @@ class VAE(object):
                 # write statistics
                 if self.tb:
                     self.writer.add_summary(sum, nb)
-                # self.csv.writeline(
-                #     datetime.datetime.now().isoformat(),
-                #     ep,
-                #     nb,
-                #     loss,
-                #     kl_loss,
-                #     *[z for z in zi_kl]
-                # )
+                    self.csv.writeline(
+                        datetime.datetime.now().isoformat(),
+                        ep,
+                        nb,
+                        loss,
+                        kl_loss,
+                        *[z for z in zi_kl]
+                    )
 
                 if n % print_freq == 0 and print_freq is not -1:
                     tab = tabulate([
