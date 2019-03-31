@@ -31,7 +31,7 @@ class LazyVAE(EnvWrapper):
 
         # separate session for VAE graph & create VAE
         self.vae_s = tf.Session()
-        self.vae = VAE(load_from=load_from, sess=self.vae_s)
+        self.vae = VAE(load_from=load_from, session=self.vae_s)
 
         bs = self.observation_space.shape[-1]
         self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(bs*2*self.vae.latent_dim,))

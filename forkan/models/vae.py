@@ -99,8 +99,8 @@ class VAE(object):
 
         # define kullback leibler divergence
         self.kl_loss = 1 + self.logvars - K.square(self.mus) - K.exp(self.logvars)
-        self.kl_loss = -0.5 * K.sum(self.kl_loss, axis=-1)
-        self.vae_loss = K.mean(self.re_loss + self.beta * K.mean(self.kl_loss))
+        self.kl_loss = -0.5 * K.mean(self.kl_loss, axis=0)
+        self.vae_loss = K.mean(self.re_loss + self.beta * K.sum(self.kl_loss))
 
         # create optimizer
         self.train_op = optimizer(learning_rate=self.lr).minimize(self.vae_loss)
@@ -123,7 +123,8 @@ class VAE(object):
         if self.tb:
             self._tensorboard_setup()
 
-        csv_header = ['date', '#episode', '#batch', 'rec-loss', 'kl-loss']
+        csv_header = ['date', '#episode', '#batch', 'rec-loss', 'kl-loss'] +\
+                     ['z{}-kl'.format(i) for i in range(self.latent_dim)]
         self.csv = CSVLogger('{}/progress.csv'.format(self.savepath), *csv_header)
 
     def __del__(self):
@@ -194,17 +195,13 @@ class VAE(object):
         """ encodes frame(s) """
 
         batch = self._preprocess_batch(batch)
-        # self.log.info('encoding batch with shape {}'.format(batch.shape))
-        # batch as first dim
-        return np.moveaxis(self.s.run([self.mus, self.logvars], feed_dict={self._input: batch}), 1, 0)
+        return self.s.run([self.mus, self.logvars], feed_dict={self._input: batch})
 
     def encode_and_sample(self, batch):
         """ encodes frame(s) and samples from dists """
 
         batch = self._preprocess_batch(batch)
-        # self.log.info('encoding and sampling zs for batch with shape {}'.format(batch.shape))
-        # batch as first dim
-        return np.moveaxis(self.s.run([self.mus, self.logvars, self.z], feed_dict={self._input: batch}), 1, 0)
+        return self.s.run([self.mus, self.logvars, self.z], feed_dict={self._input: batch})
 
     def decode(self, zs):
         """ dcodes batch of latent representations """
@@ -239,20 +236,20 @@ class VAE(object):
                 bps = int(nb / (time.time() - tstart))
                 x = dataset[idx:min(idx+batch_size, num_samples), ...]
                 if self.tb:
-                    _, suma, loss, re_loss, kl_loss = self.s.run([self.train_op, self.merge_op, self.vae_loss,
-                                                               self.re_loss, self.kl_loss],
-                                                              feed_dict={self._input: x,
-                                                                         self.bps_ph: bps,
-                                                                         self.ep_ph: ep
-                                                                         })
+                    _, suma, loss, re_loss, kl_losses = self.s.run([self.train_op, self.merge_op, self.vae_loss,
+                                                                  self.re_loss, self.kl_loss],
+                                                                 feed_dict={self._input: x,
+                                                                            self.bps_ph: bps,
+                                                                            self.ep_ph: ep
+                                                                            })
                     self.writer.add_summary(suma, nb)
                 else:
-                    _, loss, re_loss, kl_loss = self.s.run([self.train_op, self.vae_loss, self.re_loss, self.kl_loss],
-                                                         feed_dict={self._input: x})
+                    _, loss, re_loss, kl_losses = self.s.run([self.train_op, self.vae_loss, self.re_loss, self.kl_loss],
+                                                           feed_dict={self._input: x})
 
                 # mean losses
                 re_loss = np.mean(re_loss)
-                kl_loss = np.mean(kl_loss)
+                kl_loss = self.beta * np.sum(kl_losses)
 
                 # increase batch counter
                 nb += 1
@@ -263,6 +260,7 @@ class VAE(object):
                     nb,
                     re_loss,
                     kl_loss,
+                    *kl_losses
                 )
 
                 if n % print_freq == 0 and print_freq is not -1:
@@ -276,7 +274,6 @@ class VAE(object):
 
                     hrs = int(min2go // 60)
                     mins = int(min2go) % 60
-                    # self.log.info('ETA: {}h {}min | done {}% '.format(hrs, mins, int(perc)))
 
                     tab = tabulate([
                         ['name', f'{self.name}-b{self.beta}'],
@@ -307,9 +304,9 @@ class VAE(object):
 
 
 if __name__ == '__main__':
-    from forkan.datasets.dsprites import load_dsprites
-    (data, _) = load_dsprites('translation', repetitions=10)
-    v = VAE(data.shape[1:], name='test', network='dsprites', beta=30.1, latent_dim=5)
+    from forkan.datasets import load_uniform_pendulum
+    data = load_uniform_pendulum()
+    v = VAE(data.shape[1:], name='test', network='pendulum', beta=30.1, latent_dim=5)
     v.train(data[:160], num_episodes=5, print_freq=20)
 
 
