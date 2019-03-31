@@ -4,7 +4,6 @@ import numpy as np
 from gym import spaces
 from gym.utils import seeding
 from collections import deque
-import tensorflow as tf
 
 from forkan.models import VAE
 
@@ -24,9 +23,6 @@ class VecVAEStack(gym.Env):
         self.env = env
         self.num_envs = self.env.num_envs
         self.k = k
-
-        self.sess = tf.Session(graph=tf.Graph())
-        # self.sess = get_session() # loading a trained VAE into the RL session destroys everything. DONT DO IT
 
         self.v = VAE(load_from=load_from, network=vae_network)
 
@@ -49,8 +45,7 @@ class VecVAEStack(gym.Env):
                 q.appendleft([0]*self.v.latent_dim)
 
     def _process(self, obs):
-        with self.sess.graph.as_default():
-            mus, _ = self.v.encode(obs)
+        mus, _ = self.v.encode(obs)
         for i in range(self.num_envs):
             self.queues[i].appendleft(mus[i].copy())
 
