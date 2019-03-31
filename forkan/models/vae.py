@@ -1,164 +1,67 @@
+import time
 import json
 import numpy as np
+import tensorflow as tf
+
+import tensorflow.keras.backend as K
 
 import logging
+import datetime
 
-from datetime import datetime
-from keras.utils import plot_model
-from keras import backend as K
-from keras.callbacks import Callback, LambdaCallback
-from keras import optimizers
+from tabulate import tabulate
 
 from forkan import model_path
-from forkan.common.csv_logger import CSVLogger
-from forkan.common.utils import prune_dataset, create_dir, print_dict, clean_dir, copytree
+from forkan.common import CSVLogger
+from forkan.common.utils import print_dict, create_dir, clean_dir, copytree
+from forkan.common.tf_utils import scalar_summary
 from forkan.models.vae_networks import build_network
-
-
-class VAECallback(Callback):
-
-    def __init__(self, model, val=None):
-        super().__init__()
-
-        self.log = logging.getLogger('vae_CB')
-
-        self.m = model
-        self.val = val
-        self.epoch = 0
-        self.batch = 0
-
-        if self.val is None:
-            self.log.warning('No validation set given. Won\'t log to csv.')
-
-    def on_batch_end(self, batch, logs=None):
-        self.batch += 1
-
-    def on_epoch_end(self, epoch, logs=None):
-
-        self.m.vae.save_weights('{}/weights.h5'.format(self.m.savepath), overwrite=True)
-
-        # log sigmas
-        if self.val is not None:
-            mus, logvars, zs, kl = self.m.encoder.predict(self.val)
-            logvars = np.mean(logvars, axis=0)
-            mus = np.mean(mus, axis=0)
-
-            sigmas = np.exp(0.5 * logvars)
-
-            print('STD.DEV.\n', sigmas)
-            print('MU.\n', mus)
-
-            x_hat, rec_loss = self.m.decoder.predict([zs, self.val])
-            kl_mean, rec_mean = np.mean(kl), np.mean(rec_loss)
-            beta = K.eval(self.m.beta_var)
-
-            self.m.csv.writeline(
-                    datetime.now().isoformat(),
-                    self.epoch,
-                    self.batch,
-                    rec_mean,
-                    kl_mean,
-                    beta,
-                    *mus,
-                    *sigmas,
-                )
-
-            self.epoch += 1
 
 
 class VAE(object):
 
-    def __init__(self,
-                 input_shape=None,
-                 latent_dim=10,
-                 beta=1.,
-                 network='dsprites',
-                 name='vae',
-                 plot_models=False,
-                 lr=1e-3,
-                 load_from=None,
-                 warmup=None,
-                 optimizer=optimizers.Adam,
-                 sess=None,
-                 ):
-        """
+    def __init__(self, input_shape=None, name='default', network='atari', latent_dim=20, beta=5.5, lr=1e-4,
+                 load_from=None, session=None, optimizer=tf.train.AdamOptimizer, tensorboard=False):
 
-        Basic implementation af a Variational Auto Encoder using Keras.
-        A beta as weight for the KL in the loss term can also be given.
-
-
-        Parameters
-        ----------
-
-        input_shape : tuple
-            shape of desired input as tuple
-
-        latent_dim : int
-            number of nodes in bottleneck layer aka size of latent dimension
-
-        network : str
-            string identifier for network architecture as defined in 'networks.py'
-
-        beta : float
-            weighting of the KL divergence in the loss
-
-        name : str
-            descriptive name of this model
-        """
+        if input_shape is None:
+            assert load_from is not None, 'input shape need to be given if no model is loaded'
 
         self.log = logging.getLogger('vae')
 
-        if sess is not None:
-            K.set_session(sess)
-
-        # some metadata for weight file names
-        self.name = name
-
-        if load_from is None:  # fresh vae
+        if load_from is None: # fresh vae
             # take care of correct input dim: (BATCH, HEIGHT, WIDTH, CHANNELS)
             # add channel dim if not provided
             if len(input_shape) == 2:
                 input_shape = input_shape + (1,)
 
-            self.input_shape = input_shape
             self.latent_dim = latent_dim
             self.network = network
+            self.beta = beta
             self.name = name
-            self.warmup = warmup
             self.lr = lr
 
-            if self.name is None or self.name == '':
-                self.name = 'default'
+            # add batch dim
+            self.input_shape = (None,) + input_shape
 
-            self.savename = '{}-b{}-lat{}-lr{}'.format(name, beta, latent_dim, lr)
-
-            if warmup:
-                self.savename = '{}-{}'.format(self.savename, 'WU{}'.format(warmup))
-
-            self.savename = '{}-{}'.format(self.savename, datetime.now().strftime('%Y-%m-%dT%H:%M'))
-            self.parent_dir = '{}vae-{}'.format(model_path, network)
-            self.savepath = '{}vae-{}/{}/'.format(model_path, network, self.savename)
+            self.savename = '{}-b{}-lat{}-lr{}-{}'.format(name, beta, latent_dim, lr,
+                                                          datetime.datetime.now().strftime('%Y-%m-%dT%H:%M'))
+            self.parent_dir = '{}TFvae-{}'.format(model_path, network)
+            self.savepath = '{}TFvae-{}/{}/'.format(model_path, network, self.savename)
             create_dir(self.savepath)
 
             self.log.info('storing files under {}'.format(self.savepath))
 
             params = locals()
             params.pop('self')
-            params.pop('load_from')
             params.pop('optimizer')
+            params.pop('session')
 
             with open('{}/params.json'.format(self.savepath), 'w') as outfile:
                 json.dump(params, outfile)
-
-            # store from file anyways
-            with open('{}from'.format(self.savepath), 'a') as fi:
-                fi.write('{}\n'.format(self.savepath.split('/')[-2]))
-
-        else:  # load old parameter
+        else: # load old parameter
 
             self.savename = load_from
-            self.parent_dir = '{}vae-{}'.format(model_path, network)
-            self.savepath = '{}vae-{}/{}/'.format(model_path, network, self.savename)
+            self.parent_dir = '{}TFvae-{}'.format(model_path, network)
+            self.savepath = '{}TFvae-{}/{}/'.format(model_path, network, self.savename)
 
             self.log.info('loading model and parameters from {}'.format(self.savepath))
 
@@ -169,115 +72,223 @@ class VAE(object):
                 for k, v in params.items():
                     setattr(self, k, v)
 
+                # add batch dim
+                self.input_shape = (None,) + tuple(self.input_shape)
             except Exception as e:
                 self.log.critical('loading {}/params.json failed!\n{}'.format(self.savepath, e))
                 exit(0)
 
-        with K.get_session().graph.as_default() as g:
-            with g.name_scope('vae') as scope:
-                # print(f'keras graph {g}')
-                if self.warmup:
+        # store number of channels
+        self.num_channels = self.input_shape[-1]
 
-                    self.beta_var = K.variable(value=0)
-                    self.beta_cb = LambdaCallback(on_epoch_begin=lambda epoch, log: warmup_fn(epoch))
+        self.tb = tensorboard
 
-                    # Define the callback to change the callback during training
-                    def warmup_fn(epoch):
-                        # ramping up + const (we start with epoch=0)
-                        value = (0 + beta * (epoch / warmup)) * (epoch <= warmup) + \
-                                beta * (epoch > warmup)
-                        K.set_value(self.beta_var, value)
-                else:
-                    self.beta_var = K.variable(value=beta)
+        with tf.variable_scope('{}-ph'.format(self.name)):
+            self._input = tf.placeholder(tf.float32, shape=self.input_shape, name='input')
 
-                # load network
-                io, models, zs = build_network(self.input_shape, self.latent_dim, self.beta_var,
-                                               batch_norm=False, network=network)
+        """ TF Graph setup """
+        self.mus, self.logvars, self.z, self._output = \
+            build_network(self._input, self.input_shape, latent_dim=self.latent_dim, network_type=self.network)
+        print('\n')
 
-                # unpack network
-                self.inputs, self.outputs = io
-                self.encoder, self.decoder, self.vae = models
-                self.z_mean, self.z_log_var, self.z = zs
+        """ Loss """
+        # Loss
+        # Reconstruction loss
+        self.re_loss = K.binary_crossentropy(K.flatten(self._input), K.flatten(self._output))
+        self.re_loss *= self.input_shape[1] ** 2  # dont square, use correct dims
 
-                self.encode = lambda x: np.asarray(self.encoder.predict(x)[:3])
-                self.decode = lambda x: np.asarray(self.decoder.predict([x, np.random.normal(0, 1, (1, 64, 64, 1))])[0])
-                self.full_decode = lambda x, y: np.asarray(self.decoder.predict([x, y])[0])
-                self.full_forward = lambda x: np.asarray(self.vae.predict(x), dtype=np.float32)
+        # define kullback leibler divergence
+        self.kl_loss = 1 + self.logvars - K.square(self.mus) - K.exp(self.logvars)
+        self.kl_loss = -0.5 * K.mean(self.kl_loss, axis=0)
+        self.vae_loss = K.mean(self.re_loss + self.beta * K.sum(self.kl_loss))
 
-                # make sure that input and output shapes match
-                assert self.inputs._keras_shape[1:] == self.outputs._keras_shape[1:], 'shape mismatch: in {} out {}'.format(self.inputs._keras_shape[1:],
-                                                                                                                            self.outputs._keras_shape[1:])
+        # create optimizer
+        self.train_op = optimizer(learning_rate=self.lr).minimize(self.vae_loss)
 
-                if load_from is not None:
-                    self.log.info('restoring graph ... ')
-                    self.vae.load_weights('{}/weights.h5'.format(self.savepath))
-                    self.log.info('done!')
+        """ TF setup """
+        self.s = tf.Session() or session
+        tf.global_variables_initializer().run(session=self.s)
 
-                    self.log.info('diabeling VAE training ')
-                    for mo in [self.vae, self.encoder, self.decoder]:
-                        for l in mo.layers:
-                            l.trainable = False
-                        # compile entire auto encoder
+        # Saver objects handles writing and reading protobuf weight files
+        self.saver = tf.train.Saver(var_list=tf.all_variables())
 
-                self.vae.compile(optimizer(lr=self.lr), metrics=['accuracy'], loss=None)
+        if load_from is not None:
+            self.log.info('restoring graph ... ')
+            self.saver.restore(self.s, '{}'.format(self.savepath))
+            self.log.info('done!')
 
         self.log.info('VAE has parameters:')
         print_dict(params, lo=self.log)
 
+        if self.tb:
+            self._tensorboard_setup()
 
-        csv_header = ['date', '#episode', '#batch', 'rec-loss', 'kl-loss', 'beta',]\
-                     + ['mu-{}'.format(i) for i in range(self.latent_dim)]\
-                     + ['sigma-{}'.format(i) for i in range(self.latent_dim)]
+        csv_header = ['date', '#episode', '#batch', 'rec-loss', 'kl-loss'] +\
+                     ['z{}-kl'.format(i) for i in range(self.latent_dim)]
         self.csv = CSVLogger('{}/progress.csv'.format(self.savepath), *csv_header)
 
-        # log summaries
-        self.log.info('ENCODER')
-        self.encoder.summary()
-        self.log.info('DECODER')
-        self.decoder.summary()
-        self.log.info(' MODEL')
-        self.vae.summary()
+    def __del__(self):
+        """ cleanup after object finalization """
 
-        if plot_models:
-            plot_model(self.encoder,
-                       to_file='encoder.png',
-                       show_shapes=True)
-            plot_model(self.decoder,
-                       to_file='decoder.png',
-                       show_shapes=True)
-            plot_model(self.vae,
-                       to_file='vae.png',
-                       show_shapes=True)
+        # close tf.Session
+        if hasattr(self, 's'):
+           self.s.close()
 
-        self.log.info('(beta) VAE for {} with beta = {} and |z| = {} and learning rate of {}'
-                      .format(self.network, self.beta_var, self.latent_dim, self.lr))
+    def _save(self):
+        """ Saves current weights """
+        self.log.info('saving weights')
+        self.saver.save(self.s, self.savepath)
 
-        print(f'keras session {K.get_session()}')
+    def _tensorboard_setup(self):
+        """ Tensorboard (TB) setup """
 
-    def train(self, data, val=None, num_episodes=50, batch_size=128):
-        """
-        Trains VAE on given dataset. Validation set can be given, which
-        will be passed down the callbacks bound to training.
-        """
+        with tf.variable_scope('{}-ph'.format(self.name)):
+            self.bps_ph = tf.placeholder(tf.int32, (), name='batches-per-second')
+            self.ep_ph = tf.placeholder(tf.int32, (), name='episode')
 
-        # prune datasets to avoid error
-        data = prune_dataset(data, batch_size)
+        scalar_summary('batches-per-second', self.bps_ph)
+        scalar_summary('episode', self.ep_ph)
 
-        cb = VAECallback(self, data[:min(512, len(data)-1),...])
+        mu_mean = tf.reduce_mean(self.mus, axis=0)
+        vars_mean = tf.reduce_mean(tf.exp(0.5 * self.logvars), axis=0)
 
-        # train vae
-        start = datetime.now()
+        with tf.variable_scope('loss'):
+            scalar_summary('reconstruction-loss', self.re_loss)
+            scalar_summary('total-loss', self.vae_loss)
+            scalar_summary('kl-loss', self.kl_loss)
 
-        callbacks = [cb]
-        if self.warmup: callbacks += [self.beta_cb]
+        with tf.variable_scope('zj_mu'):
+            for i in range(self.latent_dim):
+                scalar_summary('z{}-mu'.format(i), mu_mean[i])
 
-        self.vae.fit(data, epochs=num_episodes, batch_size=batch_size, callbacks=callbacks)
+        with tf.variable_scope('zj_var'):
+            for i in range(self.latent_dim):
+                scalar_summary('z{}-var'.format(i), vars_mean[i])
 
-        elapsed = datetime.now() - start
-        self.log.info('Training took {}.'.format(elapsed))
+        self.merge_op = tf.summary.merge_all()
 
-        # empty buffers
-        self.csv.flush()
+        self.writer = tf.summary.FileWriter(self.savepath,
+                                            graph=tf.get_default_graph())
+            
+    def _preprocess_batch(self, batch):
+        """ preprocesses batch """
+
+        assert np.max(batch) <= 1, 'normalise input first!'
+
+        if len(batch.shape) != 4:
+            """ completing batch shape if some dimesions are missing """
+            # grayscale, one sample
+            if len(batch.shape) == 2:
+                batch = np.expand_dims(np.expand_dims(batch, axis=-1), axis=0)
+            # either  batch of grascale or single multichannel image
+            elif len(batch.shape) == 3:
+                if batch.shape == self.input_shape[1:]:  # single frame
+                    batch = np.expand_dims(batch, axis=0)
+                else:  # batch of grayscale
+                    batch = np.expand_dims(batch, axis=-1)
+
+        assert len(batch.shape) == 4, 'batch shape mismatch'
+
+        return batch
+
+    def encode(self, batch):
+        """ encodes frame(s) """
+
+        batch = self._preprocess_batch(batch)
+        return self.s.run([self.mus, self.logvars], feed_dict={self._input: batch})
+
+    def encode_and_sample(self, batch):
+        """ encodes frame(s) and samples from dists """
+
+        batch = self._preprocess_batch(batch)
+        return self.s.run([self.mus, self.logvars, self.z], feed_dict={self._input: batch})
+
+    def decode(self, zs):
+        """ dcodes batch of latent representations """
+
+        if len(zs.shape) == 1:
+            zs = np.expand_dims(zs, 0)
+
+        assert len(zs.shape) == 2, 'z batch shape mismatch'
+        assert zs.shape[-1] == self.latent_dim, 'vae has latent space of {}, got {}'.format(self.latent_dim, zs.shape[-1])
+
+        return self.s.run(self._output, feed_dict={self.z: zs})
+
+    def train(self, dataset, batch_size=32, num_episodes=30, print_freq=10):
+        num_samples = len(dataset)
+
+        assert np.max(dataset) <= 1, 'provide normalized dataset!'
+
+        # some sanity checks
+        dataset = self._preprocess_batch(dataset)
+
+        self.log.info('Training on {} samples for {} episodes.'.format(num_samples, num_episodes))
+        tstart = time.time()
+        nb = 1
+
+        # rollout N episodes
+        for ep in range(num_episodes):
+
+            # shuffle dataset
+            np.random.shuffle(dataset)
+
+            for n, idx in enumerate(np.arange(0, num_samples, batch_size)):
+                bps = int(nb / (time.time() - tstart))
+                x = dataset[idx:min(idx+batch_size, num_samples), ...]
+                if self.tb:
+                    _, suma, loss, re_loss, kl_losses = self.s.run([self.train_op, self.merge_op, self.vae_loss,
+                                                                  self.re_loss, self.kl_loss],
+                                                                 feed_dict={self._input: x,
+                                                                            self.bps_ph: bps,
+                                                                            self.ep_ph: ep
+                                                                            })
+                    self.writer.add_summary(suma, nb)
+                else:
+                    _, loss, re_loss, kl_losses = self.s.run([self.train_op, self.vae_loss, self.re_loss, self.kl_loss],
+                                                           feed_dict={self._input: x})
+
+                # mean losses
+                re_loss = np.mean(re_loss)
+                kl_loss = self.beta * np.sum(kl_losses)
+
+                # increase batch counter
+                nb += 1
+
+                self.csv.writeline(
+                    datetime.datetime.now().isoformat(),
+                    ep,
+                    nb,
+                    re_loss,
+                    kl_loss,
+                    *kl_losses
+                )
+
+                if n % print_freq == 0 and print_freq is not -1:
+
+                    total_batches = (num_samples // batch_size) * num_episodes
+
+                    perc = ((nb) / total_batches) * 100
+                    steps2go = total_batches - nb
+                    secs2go = steps2go / bps
+                    min2go = secs2go / 60
+
+                    hrs = int(min2go // 60)
+                    mins = int(min2go) % 60
+
+                    tab = tabulate([
+                        ['name', f'{self.name}-b{self.beta}'],
+                        ['episode', ep],
+                        ['batch', n],
+                        ['bps', bps],
+                        ['rec-loss', re_loss],
+                        ['kl-loss', kl_loss],
+                        ['ETA', '{}h {}min'.format(hrs, mins)],
+                        ['done', '{}%'.format(int(perc))],
+                    ])
+
+                    print('\n{}'.format(tab))
+
+            self._save()
 
         newest = '{}/{}/'.format(self.parent_dir, self.name)
         self.log.info('done training!\ncopying files to {}'.format(newest))
@@ -292,14 +303,10 @@ class VAE(object):
             fi.write('{}\n'.format(self.savepath.split('/')[-2]))
 
 
-# simple test using dsprites dataset
 if __name__ == '__main__':
-    from forkan.datasets.dsprites import load_dsprites
+    from forkan.datasets import load_uniform_pendulum
+    data = load_uniform_pendulum()
+    v = VAE(data.shape[1:], name='test', network='pendulum', beta=30.1, latent_dim=5)
+    v.train(data[:160], num_episodes=5, print_freq=20)
 
-    # get image size
-    shape = (64, 64, 1)
-    (data, _) = load_dsprites('translation', repetitions=1)
 
-    # v = VAE(load_from='trans')
-    vae = VAE(input_shape=(64, 64, 1), beta=4.0, network='dsprites', name='trans', warmup=3)
-    vae.train(data[:128], num_episodes=10)

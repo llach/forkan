@@ -7,7 +7,6 @@ from collections import deque
 import tensorflow as tf
 
 from forkan.models import VAE
-from baselines.common.tf_util import get_session
 
 
 class VecVAEStack(gym.Env):
@@ -29,7 +28,7 @@ class VecVAEStack(gym.Env):
         self.sess = tf.Session(graph=tf.Graph())
         # self.sess = get_session() # loading a trained VAE into the RL session destroys everything. DONT DO IT
 
-        self.v = VAE(load_from=load_from, network=vae_network, sess=self.sess)
+        self.v = VAE(load_from=load_from, network=vae_network)
 
         self.action_space = env.action_space
         self.observation_space = spaces.Box(low=-2, high=2, shape=(self.k*self.v.latent_dim, ), dtype=np.float32)
@@ -51,7 +50,7 @@ class VecVAEStack(gym.Env):
 
     def _process(self, obs):
         with self.sess.graph.as_default():
-            mus, _, _ = self.v.encode(obs)
+            mus, _ = self.v.encode(obs)
         for i in range(self.num_envs):
             self.queues[i].appendleft(mus[i].copy())
 
