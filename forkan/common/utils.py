@@ -1,9 +1,11 @@
 import os
 import math
 import errno
+import json
 import shutil
 import numpy as np
 import functools
+import datetime
 import inspect
 import logging
 import matplotlib.pyplot as plt
@@ -194,6 +196,54 @@ def rename_latest_run(path):
     if os.path.isdir('{}/run-latest'.format(path)):
         os.rename('{}/run-latest'.format(path), '{}/run-{}'.format(path, idx))
 
+
+def log_alg(name, env_id, params, vae=None, num_envs=1, save=True, lr=None, k=None):
+    from forkan import model_path
+
+    params.update({'nenvs': num_envs})
+
+    print_dict(params)
+
+    env_id_lower = env_id.replace('NoFrameskip', '').lower().split('-')[0]
+
+    if vae is not None and vae is not '':
+        savename = '{}-{}-nenv{}'.format(env_id_lower, vae, num_envs)
+    else:
+        savename = '{}-noVAE-nenv{}'.format(env_id_lower, num_envs)
+
+    if lr is not None and not callable(lr):
+        savename = '{}-lr{}'.format(savename, lr)
+
+    if k is not None and not callable(k):
+        savename = '{}-k{}'.format(savename, k)
+
+    savename = '{}-{}'.format(savename, datetime.datetime.now().strftime('%Y-%m-%dT%H:%M'))
+
+    savepath = '{}{}/{}/'.format(model_path, name, savename)
+
+    if save: create_dir(savepath)
+
+    # clean params form non-serializable objects
+    for par in ['env', 'params', 'epinfobuf', 'model_fn', 'runner', 'Model', 'model', 'ac_space', 'ob_space']:
+        if par in params.keys():
+            params.pop(par)
+
+    func_keys = []
+    for key, value in params.items():
+        if callable(value):
+            func_keys.append(key)
+    for fk in func_keys:
+        params.pop(fk)
+
+    if save:
+        # store from file anyways
+        with open('{}from'.format(savepath), 'a') as fi:
+            fi.write('{}\n'.format(savename))
+
+        with open('{}/params.json'.format(savepath), 'w') as outfile:
+            json.dump(params, outfile)
+
+    return savepath, env_id_lower
 
 def animate_greyscale_dataset(dataset):
     '''
