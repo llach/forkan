@@ -3,12 +3,7 @@ import inspect
 import logging
 
 from forkan.rl.env_wrapper import EnvWrapper
-from forkan.rl.envs import VecVAEStack, VAEStack
-
-
-from forkan.rl.base_agent import BaseAgent
-from forkan.rl.algos import DQN, A2C, TRPO
-
+from forkan.rl.envs import VecVAEStack, VAEStack, VAEGradient
 
 logger = logging.getLogger(__name__)
 
@@ -26,15 +21,7 @@ def make(**kwargs):
 
         e = gym.make(**gym_args)
 
-        # wrap env if constructor arguments are found in kwargs
-        for env in [AtariPrep]:
-            if any(map(lambda x: x in kwargs.keys(), get_filtered_args(env))):
-                e = env(e, **kwargs)
-
         return e
 
-    # either we thread the env or return the constructed environment
-    if 'num_envs' in kwargs:
-        return MultiEnv(kwargs['num_envs'], maker)
-    else:
-        return maker()
+
+    return maker()
