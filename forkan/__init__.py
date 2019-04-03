@@ -12,8 +12,6 @@ log_file = os.environ['HOME'] + '/.forkan/log.txt'
 from logging.config import dictConfig
 from forkan.common.utils import create_dir, textbf, textcolor
 
-fixed_seed = True
-
 logging_config = dict(
     version=1,
     formatters={
@@ -47,12 +45,6 @@ coloredlogs.install(level='DEBUG', fmt=fmt, datefmt=datefmt)
 
 for d in [model_path, dataset_path, figure_path]:
     create_dir(d)
-
-# set numpy seed
-if fixed_seed:
-    import numpy as np
-    np.random.seed(0)
-    logger.critical('Starting in fixed seed mode!')
 
 # constants
 EPS = 1e-8
