@@ -11,7 +11,7 @@ def _build_conv(x, x_shape, rec_shape, latent_dim, network_type,
 
     num_channels = x.shape[-1]
 
-    with tf.name_scope('encoder'):
+    with tf.variable_scope('encoder'):
         log.info('===== {}-network ===== '.format(network_type))
         log.info('input: {}'.format(x.shape))
         log.info('===== encoder')
@@ -30,8 +30,8 @@ def _build_conv(x, x_shape, rec_shape, latent_dim, network_type,
 
         fc = tf.contrib.layers.fully_connected(flat_encoder, hiddens, activation_fn=tf.nn.relu)
         log.info('fc [ReLu] => {}'.format(fc.shape))
-        log.info('===== latent-{}'.format(latent_dim
-                                         ))
+        log.info('===== latent-{}'.format(latent_dim))
+
         mus = tf.contrib.layers.fully_connected(fc, latent_dim, activation_fn=None)
         logvars = tf.contrib.layers.fully_connected(fc, latent_dim, activation_fn=None)
         log.info('mus: {}'.format(mus.shape))
@@ -42,7 +42,7 @@ def _build_conv(x, x_shape, rec_shape, latent_dim, network_type,
         log.info('==> z {}'.format(z.shape))
         log.info('===== encoder')
 
-    with tf.name_scope('decoder'):
+    with tf.variable_scope('decoder'):
         fcd = tf.contrib.layers.fully_connected(z, hiddens, activation_fn=tf.nn.relu)
         log.info('fc [ReLu] => {}'.format(fcd.shape))
 

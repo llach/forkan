@@ -83,7 +83,7 @@ class VAE(object):
 
         self.tb = tensorboard
 
-        with tf.variable_scope('{}-ph'.format(self.name)):
+        with tf.variable_scope('input-ph'):
             self._input = tf.placeholder(tf.float32, shape=self.input_shape, name='input')
 
         """ TF Graph setup """
@@ -167,7 +167,7 @@ class VAE(object):
 
         self.merge_op = tf.summary.merge_all()
 
-        self.writer = tf.summary.FileWriter(self.savepath,
+        self.writer = tf.summary.FileWriter('/Users/llach/vae',
                                             graph=tf.get_default_graph())
             
     def _preprocess_batch(self, batch):
@@ -306,7 +306,7 @@ class VAE(object):
 if __name__ == '__main__':
     from forkan.datasets import load_uniform_pendulum
     data = load_uniform_pendulum()
-    v = VAE(data.shape[1:], name='test', network='pendulum', beta=30.1, latent_dim=5)
-    v.train(data[:160], num_episodes=5, print_freq=20)
+    v = VAE(data.shape[1:], name='test', network='pendulum', beta=30.1, latent_dim=5, tensorboard=True)
+    # v.train(data[:160], num_episodes=5, print_freq=20)
 
 
