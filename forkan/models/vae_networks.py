@@ -6,12 +6,8 @@ import logging
 log = logging.getLogger('vae-nets')
 
 
-def _build_conv(x, x_shape, rec_shape, latent_dim, network_type,
-                encoder_conf, decoder_conf, hiddens):
-
-    num_channels = x.shape[-1]
-
-    with tf.variable_scope('encoder'):
+def _build_encoder(x, encoder_conf, network_type, latent_dim, hiddens):
+    with tf.variable_scope('encoder', reuse=tf.AUTO_REUSE):
         log.info('===== {}-network ===== '.format(network_type))
         log.info('input: {}'.format(x.shape))
         log.info('===== encoder')
@@ -32,8 +28,11 @@ def _build_conv(x, x_shape, rec_shape, latent_dim, network_type,
         log.info('fc [ReLu] => {}'.format(fc.shape))
         log.info('===== latent-{}'.format(latent_dim))
 
-        mus = tf.contrib.layers.fully_connected(fc, latent_dim, activation_fn=None)
-        logvars = tf.contrib.layers.fully_connected(fc, latent_dim, activation_fn=None)
+        with tf.variable_scope('mus'):
+            mus = tf.contrib.layers.fully_connected(fc, latent_dim, activation_fn=None)
+        with tf.variable_scope('logvars'):
+            logvars = tf.contrib.layers.fully_connected(fc, latent_dim, activation_fn=None)
+
         log.info('mus: {}'.format(mus.shape))
         log.info('logvars: {}'.format(logvars.shape))
 
@@ -42,7 +41,12 @@ def _build_conv(x, x_shape, rec_shape, latent_dim, network_type,
         log.info('==> z {}'.format(z.shape))
         log.info('===== encoder')
 
-    with tf.variable_scope('decoder'):
+        return mus, logvars, z, encoder_last_conv_shape
+
+
+def _build_decoder(decoder_conf, z, hiddens, num_channels, encoder_last_conv_shape, rec_shape,
+                   x_shape):
+    with tf.variable_scope('decoder', reuse=tf.AUTO_REUSE):
         fcd = tf.contrib.layers.fully_connected(z, hiddens, activation_fn=tf.nn.relu)
         log.info('fc [ReLu] => {}'.format(fcd.shape))
 
@@ -61,17 +65,17 @@ def _build_conv(x, x_shape, rec_shape, latent_dim, network_type,
                                                    activation_fn=tf.nn.relu)
             log.info('conv.T {} => {}'.format(n, x.shape))
 
-        out = tf.contrib.layers.conv2d_transpose(inputs=x,
+        x_hat = tf.contrib.layers.conv2d_transpose(inputs=x,
                                                  num_outputs=num_channels,
                                                  kernel_size=1,
                                                  stride=1,
                                                  activation_fn=tf.nn.sigmoid)
 
-    log.info('output: {}'.format(out.shape))
-    assert x_shape[1:] == out.shape[1:], 'input\'s {} and ouput\'s {} shape need to match!'.format(x_shape[1:],
-                                                                                                   out.shape[1:])
+    log.info('output: {}'.format(x_hat.shape))
+    assert x_shape[1:] == x_hat.shape[1:], 'input\'s {} and ouput\'s {} shape need to match!'.format(x_shape[1:],
+                                                                                                   x_hat.shape[1:])
 
-    return mus, logvars, z, out
+    return x_hat
 
 
 def build_network(x, x_shape, latent_dim=10, network_type='atari'):
@@ -108,5 +112,12 @@ def build_network(x, x_shape, latent_dim=10, network_type='atari'):
         log.critical('network \'{}\' unknown'.format(network_type))
         exit(1)
 
-    with tf.variable_scope('vae'):
-        return _build_conv(x, x_shape, rec_shape, latent_dim, network_type, encoder_conf, decoder_conf, hiddens)
+    num_channels = x.shape[-1]
+
+    with tf.variable_scope('vae', reuse=tf.AUTO_REUSE):
+
+         mus, logvars, z, encoder_last_conv_shape = _build_encoder(x, encoder_conf, network_type, latent_dim, hiddens)
+
+         x_hat = _build_decoder(decoder_conf, z, hiddens, num_channels, encoder_last_conv_shape, rec_shape, x_shape)
+
+    return  mus, logvars, z, x_hat
