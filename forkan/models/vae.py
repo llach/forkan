@@ -14,7 +14,7 @@ from forkan import model_path
 from forkan.common import CSVLogger
 from forkan.common.utils import print_dict, create_dir, clean_dir, copytree
 from forkan.common.tf_utils import scalar_summary
-from forkan.models.vae_networks import build_network
+from forkan.models.vae_networks import build_network, build_encoder
 
 
 class VAE(object):
@@ -133,6 +133,13 @@ class VAE(object):
         # close tf.Session
         if hasattr(self, 's'):
            self.s.close()
+
+    def stack_encoder(self, inputs):
+        mus = []
+        for inx in inputs:
+            m, _, _ = build_encoder(inx, self.input_shape, latent_dim=self.latent_dim, network_type=self.network)
+            mus.append(m)
+        return mus
 
     def _save(self):
         """ Saves current weights """
@@ -307,6 +314,19 @@ if __name__ == '__main__':
     from forkan.datasets import load_uniform_pendulum
     data = load_uniform_pendulum()
     v = VAE(data.shape[1:], name='test', network='pendulum', beta=30.1, latent_dim=5, tensorboard=True)
+
+    en_ints = [tf.placeholder(tf.float32, shape=(None, 64, 64, 1)) for _ in range(2)]
+    mus = v.stack_encoder(en_ints)
+    randi = np.random.normal(0, 1, (1, 64, 64, 1))
+
+    combined_out = tf.concat(mus, axis=1)
+    with tf.Session() as s:
+        s.run(tf.global_variables_initializer())
+        print(s.run(mus, feed_dict={en_ints[0]: randi,
+                                    en_ints[1]: randi}))
+
+    writer = tf.summary.FileWriter('/Users/llach/vae',
+                                        graph=tf.get_default_graph())
     # v.train(data[:160], num_episodes=5, print_freq=20)
 
 

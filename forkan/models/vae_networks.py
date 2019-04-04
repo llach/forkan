@@ -77,6 +77,37 @@ def _build_decoder(decoder_conf, z, hiddens, num_channels, encoder_last_conv_sha
 
     return x_hat
 
+def build_encoder(x, x_shape, latent_dim=10, network_type='atari'):
+
+    if network_type == 'atari':
+        # this must not depend on input tensor, otherwise the decoder graph
+        # could not be run independently form the encoder
+        rec_shape = (-1, int(x_shape[1] / 4), int(x_shape[2] / 4), 64)
+
+        encoder_conf = zip([32, 64],  # num filter
+                           [2, 2],  # kernel size
+                           [(2, 2), (2, 2)]) # strides
+
+        hiddens = 512
+    elif network_type == 'dsprites' or network_type == 'pendulum':
+        # this must not depend on input tensor, otherwise the decoder graph
+        # could not be run independently form the encoder
+        rec_shape = (-1, int(x_shape[1] / 16), int(x_shape[2] / 16), 64)
+
+        encoder_conf = zip([32, 32, 64, 64], # num filter
+                           [4]*4, # kernel size
+                           [(2, 2)]*4) # strides
+
+        hiddens = 256
+    else:
+        log.critical('network \'{}\' unknown'.format(network_type))
+        exit(1)
+
+    with tf.variable_scope('vae', reuse=tf.AUTO_REUSE):
+         mus, logvars, z, encoder_last_conv_shape = _build_encoder(x, encoder_conf, network_type, latent_dim, hiddens)
+
+    return mus, logvars, z
+
 
 def build_network(x, x_shape, latent_dim=10, network_type='atari'):
 
@@ -120,4 +151,4 @@ def build_network(x, x_shape, latent_dim=10, network_type='atari'):
 
          x_hat = _build_decoder(decoder_conf, z, hiddens, num_channels, encoder_last_conv_shape, rec_shape, x_shape)
 
-    return  mus, logvars, z, x_hat
+    return mus, logvars, z, x_hat
