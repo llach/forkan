@@ -107,7 +107,7 @@ class VAE(object):
             self.train_op = optimizer(learning_rate=self.lr).minimize(self.vae_loss)
 
         """ TF setup """
-        self.s = tf.Session() or session
+        self.s = session if session is not None else tf.Session()
         tf.global_variables_initializer().run(session=self.s)
 
         # Saver objects handles writing and reading protobuf weight files
