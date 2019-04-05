@@ -20,7 +20,7 @@ from forkan.models.vae_networks import build_network, build_encoder
 class VAE(object):
 
     def __init__(self, input_shape=None, name='default', network='atari', latent_dim=20, beta=5.5, lr=1e-4,
-                 load_from=None, session=None, optimizer=tf.train.AdamOptimizer, tensorboard=False):
+                 load_from=None, session=None, optimizer=tf.train.AdamOptimizer, with_opt=True, tensorboard=False):
 
         if input_shape is None:
             assert load_from is not None, 'input shape need to be given if no model is loaded'
@@ -103,7 +103,8 @@ class VAE(object):
         self.vae_loss = K.mean(self.re_loss + self.beta * K.sum(self.kl_loss))
 
         # create optimizer
-        self.train_op = optimizer(learning_rate=self.lr).minimize(self.vae_loss)
+        if with_opt:
+            self.train_op = optimizer(learning_rate=self.lr).minimize(self.vae_loss)
 
         """ TF setup """
         self.s = tf.Session() or session
@@ -141,10 +142,14 @@ class VAE(object):
             mus.append(m)
         return mus
 
-    def _save(self):
+    def _save(self, suffix=''):
         """ Saves current weights """
         self.log.info('saving weights')
-        self.saver.save(self.s, self.savepath)
+        self.saver.save(self.s, f'{self.savepath}{suffix}')
+
+    def _load(self, suffix=''):
+        """ Saves weights from suffix """
+        self.saver.restore(self.s, f'{self.savepath}{suffix}')
 
     def _tensorboard_setup(self):
         """ Tensorboard (TB) setup """
@@ -324,6 +329,9 @@ if __name__ == '__main__':
         s.run(tf.global_variables_initializer())
         print(s.run(mus, feed_dict={en_ints[0]: randi,
                                     en_ints[1]: randi}))
+
+    v._save()
+    v._save('retrain')
 
     writer = tf.summary.FileWriter('/Users/llach/vae',
                                         graph=tf.get_default_graph())
