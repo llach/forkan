@@ -1,1 +1,2 @@
-from forkan.models.vae import VAE
+from .retrain_vae import RetrainVAE
+from .vae import VAE

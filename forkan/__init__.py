@@ -1,10 +1,13 @@
-import os
-import time
-import socket
 import logging
+import os
+import socket
+import time
+
 import coloredlogs
 
+home = os.environ['HOME']
 model_path = os.environ['HOME'] + '/.forkan/models/'
+chosen_path = f'{home}/.forkan/chosen-ones/'
 dataset_path = os.environ['HOME'] + '/.forkan/datasets/'
 figure_path = os.environ['HOME'] + '/.forkan/figures/'
 log_file = os.environ['HOME'] + '/.forkan/log.txt'

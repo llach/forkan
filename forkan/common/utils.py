@@ -1,18 +1,17 @@
-import os
-import math
-import json
+import datetime
 import errno
-import shutil
-import numpy as np
 import functools
 import inspect
+import json
 import logging
-import datetime
-import matplotlib.pyplot as plt
-
-
-from PIL import Image
+import math
+import os
+import shutil
 from shutil import rmtree
+
+import matplotlib.pyplot as plt
+import numpy as np
+from PIL import Image
 from keras.utils import to_categorical
 
 from forkan import model_path
@@ -80,7 +79,7 @@ def log_alg(name, env_id, params, vae=None, num_envs=1, save=True, lr=None, k=No
     if vae is not None and vae is not '':
         savename = '{}-{}-nenv{}'.format(env_id_lower, vae, num_envs)
     else:
-        savename = '{}-noVAE-nenv{}'.format(env_id_lower, num_envs)
+        savename = '{}-nenv{}'.format(env_id_lower, num_envs)
 
     if lr is not None and not callable(lr):
         savename = '{}-lr{}'.format(savename, lr)
