@@ -44,6 +44,7 @@ class RetrainVAE(object):
 
         """ TF setup """
         self.s = sess
+        assert self.s is not None, 'you need to pass a tf.Session()'
 
         """ TF Graph setup """
 
@@ -135,3 +136,117 @@ class RetrainVAE(object):
         else:
             self.log.critical('trying to load weights but did not specify location. exiting.')
             exit(1)
+
+    def train(self, dataset, batch_size=155, num_episodes=50, print_freq=5):
+        import numpy as np
+        import time
+        import datetime
+
+        from tabulate import tabulate
+        from forkan.common import CSVLogger
+        from forkan.common.tf_utils import scalar_summary
+
+        num_samples = len(dataset)
+
+        assert np.max(dataset) <= 1, 'provide normalized dataset!'
+
+        self.log.info('Training on {} samples for {} episodes.'.format(num_samples, num_episodes))
+        tstart = time.time()
+        nb = 1
+
+        train_op = tf.train.AdamOptimizer().minimize(self.vae_loss)
+
+        csv_header = ['date', '#episode', '#batch', 'rec-loss', 'kl-loss'] + \
+                     ['z{}-kl'.format(i) for i in range(self.latent_dim)]
+        csv = CSVLogger('{}/progress.csv'.format(self.savepath), *csv_header)
+
+        rel_ph = tf.placeholder(tf.float32, (), name='rec-loss')
+        kll_ph = tf.placeholder(tf.float32, (), name='rec-loss')
+        klls_ph = [tf.placeholder(tf.float32, (), name=f'z{i}-kl') for i in range(self.latent_dim)]
+
+        scalar_summary('reconstruction-loss', rel_ph, scope='vae-loss')
+        scalar_summary('kl-loss', kll_ph, scope='vae-loss')
+        for i in range(self.latent_dim):
+            scalar_summary(f'z{i}-kl', klls_ph[i], scope='z-kl')
+        merged_ = tf.summary.merge_all()
+        writer = tf.summary.FileWriter(f'{self.savepath}/board', self.s.graph)
+
+        self.s.run(tf.global_variables_initializer())
+
+        # rollout N episodes
+        for ep in range(num_episodes):
+
+            # shuffle dataset
+            np.random.shuffle(dataset)
+
+            for n, idx in enumerate(np.arange(0, num_samples, batch_size)):
+                bps = max(int(nb / (time.time() - tstart)), 1)
+                x = dataset[idx:min(idx+batch_size, num_samples), ...]
+
+                _, loss, re_loss, kl_losses = self.s.run([train_op, self.vae_loss, self.re_loss, self.kl_loss],
+                                                             feed_dict={self.X: x})
+
+                # mean losses
+                re_loss = np.mean(re_loss)
+                kl_loss = self.beta * np.sum(kl_losses)
+
+                fd = {rel_ph: re_loss,
+                      kll_ph: kl_loss,
+                      }
+
+                for i, kph in enumerate(klls_ph):
+                    fd.update({kph: kl_losses[i]})
+
+                suma = self.s.run(merged_, feed_dict=fd)
+
+                writer.add_summary(suma, nb)
+
+                # increase batch counter
+                nb += 1
+
+                csv.writeline(
+                    datetime.datetime.now().isoformat(),
+                    ep,
+                    nb,
+                    re_loss,
+                    kl_loss,
+                    *kl_losses
+                )
+
+                if n % print_freq == 0 and print_freq is not -1:
+
+                    total_batches = (num_samples // batch_size) * num_episodes
+
+                    perc = ((nb) / total_batches) * 100
+                    steps2go = total_batches - nb
+                    secs2go = steps2go / bps
+                    min2go = secs2go / 60
+
+                    hrs = int(min2go // 60)
+                    mins = int(min2go) % 60
+
+                    tab = tabulate([
+                        ['name', f'retrainvae-clean-b{self.beta}'],
+                        ['episode', ep],
+                        ['batch', n],
+                        ['bps', bps],
+                        ['rec-loss', re_loss],
+                        ['kl-loss', kl_loss],
+                        ['ETA', '{}h {}min'.format(hrs, mins)],
+                        ['done', '{}%'.format(int(perc))],
+                    ])
+
+                    print('\n{}'.format(tab))
+            self.save()
+
+        self.save()
+        print('training done!')
+
+if __name__ == '__main__':
+    from forkan import model_path
+    from forkan.datasets import load_uniform_pendulum
+
+    data = load_uniform_pendulum().reshape(6000, 5, 64, 64, 1)
+
+    v = RetrainVAE(f'{model_path}/retrain/', (64, 64, 1), network='pendulum', beta=84, latent_dim=5, sess=tf.Session())
+    v.train(data, batch_size=128)
