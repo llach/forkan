@@ -69,7 +69,7 @@ def print_dict(d, lo=None):
     lo.info('}')
 
 
-def log_alg(name, env_id, params, vae=None, num_envs=1, save=True, lr=None, k=None, seed=None, model=None):
+def log_alg(name, env_id, params, vae=None, num_envs=1, save=True, lr=None, k=None, seed=None, model=None, with_kl=False):
     params.update({'nenvs': num_envs})
 
     print_dict(params)
@@ -86,6 +86,9 @@ def log_alg(name, env_id, params, vae=None, num_envs=1, save=True, lr=None, k=No
 
     if k is not None and not callable(k):
         savename = '{}-k{}'.format(savename, k)
+
+    if with_kl:
+        savename = f'{savename}-withKL'
 
     if seed is not None and not callable(seed):
         savename = '{}-seed{}'.format(savename, seed)
