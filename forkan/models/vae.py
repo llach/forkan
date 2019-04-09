@@ -1,25 +1,23 @@
-import time
+import datetime
 import json
+import logging
+import time
+
 import numpy as np
 import tensorflow as tf
-
 import tensorflow.keras.backend as K
-
-import logging
-import datetime
-
 from tabulate import tabulate
 
 from forkan import model_path
 from forkan.common import CSVLogger
-from forkan.common.utils import print_dict, create_dir, clean_dir, copytree
 from forkan.common.tf_utils import scalar_summary
+from forkan.common.utils import print_dict, create_dir, clean_dir, copytree
 from forkan.models.vae_networks import build_network, build_encoder
 
 
 class VAE(object):
 
-    def __init__(self, input_shape=None, name='default', network='atari', latent_dim=20, beta=5.5, lr=1e-4,
+    def __init__(self, input_shape=None, name='default', network='atari', latent_dim=20, beta=1.0, lr=1e-4,
                  load_from=None, session=None, optimizer=tf.train.AdamOptimizer, with_opt=True, tensorboard=False):
 
         if input_shape is None:

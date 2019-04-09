@@ -11,7 +11,7 @@ from forkan.models.vae_networks import build_network
 
 class RetrainVAE(object):
 
-    def __init__(self, rlpath, input_shape, network='pendulum', latent_dim=20, beta=5.5, k=5,
+    def __init__(self, rlpath, input_shape, network='pendulum', latent_dim=20, beta=1.0, k=5,
                  init_from=None, with_attrs=False, sess=None):
 
         self.log = logging.getLogger('vae')
