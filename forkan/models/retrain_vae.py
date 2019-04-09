@@ -1,6 +1,7 @@
 import json
 import logging
 
+import numpy as np
 import tensorflow as tf
 import tensorflow.keras.backend as K
 
@@ -136,6 +137,34 @@ class RetrainVAE(object):
         else:
             self.log.critical('trying to load weights but did not specify location. exiting.')
             exit(1)
+
+    def _preprocess_batch(self, batch):
+        """ preprocesses batch """
+
+        assert np.max(batch) <= 1, 'normalise input first!'
+
+        if len(batch.shape) != 4:
+            """ completing batch shape if some dimesions are missing """
+            # grayscale, one sample
+            if len(batch.shape) == 2:
+                batch = np.expand_dims(np.expand_dims(batch, axis=-1), axis=0)
+            # either  batch of grascale or single multichannel image
+            elif len(batch.shape) == 3:
+                if batch.shape == self.input_shape[1:]:  # single frame
+                    batch = np.expand_dims(batch, axis=0)
+                else:  # batch of grayscale
+                    batch = np.expand_dims(batch, axis=-1)
+
+        assert len(batch.shape) == 4, 'batch shape mismatch'
+
+        return batch
+
+    def encode(self, batch):
+        """ encodes frame(s) """
+
+        batch = self._preprocess_batch(batch)
+        batch = np.expand_dims(batch, 1)
+        return self.s.run([self.mus[0], self.logvars[0]], feed_dict={self.X: batch})
 
     def train(self, dataset, batch_size=155, num_episodes=50, print_freq=5):
         import numpy as np
