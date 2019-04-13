@@ -277,5 +277,5 @@ if __name__ == '__main__':
 
     data = load_uniform_pendulum().reshape(6000, 5, 64, 64, 1)
 
-    v = RetrainVAE(f'{model_path}/retrain/', (64, 64, 1), network='pendulum', beta=84, latent_dim=5, sess=tf.Session())
+    v = RetrainVAE(f'{model_path}/retrain/', (64, 64, 1), network='pendulum-mini', beta=84, latent_dim=5, sess=tf.Session())
     v.train(data, batch_size=128)

@@ -1,7 +1,7 @@
+import logging
+
 import numpy as np
 import tensorflow as tf
-
-import logging
 
 log = logging.getLogger('vae-nets')
 
@@ -99,6 +99,16 @@ def build_encoder(x, x_shape, latent_dim=10, network_type='atari'):
                            [(2, 2)]*4) # strides
 
         hiddens = 256
+    elif network_type == 'pendulum-mini':
+        # this must not depend on input tensor, otherwise the decoder graph
+        # could not be run independently form the encoder
+        rec_shape = (-1, int(x_shape[1] / 8), int(x_shape[2] / 8), 64)
+
+        encoder_conf = zip([32, 64,], # num filter
+                           [4]*2, # kernel size
+                           [(2, 2)]*2) # strides
+
+        hiddens = 256
     else:
         log.critical('network \'{}\' unknown'.format(network_type))
         exit(1)
@@ -137,6 +147,20 @@ def build_network(x, x_shape, latent_dim=10, network_type='atari'):
         decoder_conf = zip([64, 64, 32, 32],  # num filter
                            [4]*4,  # kernel size
                            [(2, 2)]*4)  # strides
+
+        hiddens = 256
+    elif network_type == 'pendulum-mini':
+        # this must not depend on input tensor, otherwise the decoder graph
+        # could not be run independently form the encoder
+        rec_shape = (-1, int(x_shape[1] / 4), int(x_shape[2] / 4), 64)
+        print(rec_shape)
+        encoder_conf = zip([32, 64],  # num filter
+                           [4] * 2,  # kernel size
+                           [(2, 2)] * 2)  # strides
+
+        decoder_conf = zip([64, 32],  # num filter
+                           [4] * 2,  # kernel size
+                           [(2, 2)] * 2)  # strides
 
         hiddens = 256
     else:
