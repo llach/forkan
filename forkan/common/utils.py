@@ -107,7 +107,7 @@ def log_alg(name, env_id, params, vae=None, num_envs=1, save=True, lr=None, k=No
     if save: create_dir(savepath)
 
     # clean params form non-serializable objects
-    for par in ['env', 'params', 'epinfobuf', 'model_fn', 'runner', 'Model', 'model', 'ac_space', 'ob_space']:
+    for par in ['env', 'params', 'epinfobuf', 'model_fn', 'runner', 'Model', 'model', 'ac_space', 'ob_space', 'sess']:
         if par in params.keys():
             params.pop(par)
 
