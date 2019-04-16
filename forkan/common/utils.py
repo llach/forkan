@@ -70,7 +70,7 @@ def print_dict(d, lo=None):
 
 
 def log_alg(name, env_id, params, vae=None, num_envs=1, save=True, lr=None, k=None, seed=None, model=None, with_kl=False,
-            rl_coef=None):
+            rl_coef=None, early_stop=False, target_kl=None):
     params.update({'nenvs': num_envs})
 
     print_dict(params)
@@ -90,6 +90,13 @@ def log_alg(name, env_id, params, vae=None, num_envs=1, save=True, lr=None, k=No
 
     if k is not None and not callable(k):
         savename = '{}-k{}'.format(savename, k)
+
+    if early_stop:
+        if target_kl is not None:
+            savename = f'{savename}-stop{target_kl}'
+        else:
+            savename = f'{savename}-stop'
+            logger.warning('early stopping set, but no target KL given!')
 
     if with_kl:
         savename = f'{savename}-withKL'
