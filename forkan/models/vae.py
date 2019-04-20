@@ -243,7 +243,7 @@ class VAE(object):
             np.random.shuffle(dataset)
 
             for n, idx in enumerate(np.arange(0, num_samples, batch_size)):
-                bps = int(nb / (time.time() - tstart))
+                bps = max(int(nb / (time.time() - tstart)), 1)
                 x = dataset[idx:min(idx+batch_size, num_samples), ...]
                 if self.tb:
                     _, suma, loss, re_loss, kl_losses = self.s.run([self.train_op, self.merge_op, self.vae_loss,
