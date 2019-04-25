@@ -180,8 +180,11 @@ class VAE(object):
         self.writer = tf.summary.FileWriter('/Users/llach/vae',
                                             graph=tf.get_default_graph())
             
-    def _preprocess_batch(self, batch):
+    def _preprocess_batch(self, batch, norm_fac=None):
         """ preprocesses batch """
+
+        if norm_fac is not None:
+            batch = batch * norm_fac
 
         assert np.max(batch) <= 1, 'normalise input first!'
 
@@ -205,10 +208,10 @@ class VAE(object):
         """ returns reconstructions from batch of frames """
         return self.decode(self.encode_and_sample(batch)[-1])
 
-    def encode(self, batch):
+    def encode(self, batch, norm_fac=None):
         """ encodes frame(s) """
 
-        batch = self._preprocess_batch(batch)
+        batch = self._preprocess_batch(batch, norm_fac)
         return self.s.run([self.mus, self.logvars], feed_dict={self._input: batch})
 
     def encode_and_sample(self, batch):

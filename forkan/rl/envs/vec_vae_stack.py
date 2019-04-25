@@ -1,11 +1,12 @@
-import gym
 import logging
-import numpy as np
-from gym import spaces
-from gym.utils import seeding
 from collections import deque
 
+import numpy as np
+
+import gym
 from forkan.models import VAE
+from gym import spaces
+from gym.utils import seeding
 
 
 class VecVAEStack(gym.Env):
@@ -15,6 +16,7 @@ class VecVAEStack(gym.Env):
                  k=3,
                  load_from='pend-optimal',
                  vae_network='pendulum',
+                 norm_fac=None,
                  **kwargs,
                  ):
 
@@ -23,6 +25,7 @@ class VecVAEStack(gym.Env):
         self.env = env
         self.num_envs = self.env.num_envs
         self.k = k
+        self.norm_fac = norm_fac
 
         self.v = VAE(load_from=load_from, network=vae_network)
 
@@ -45,7 +48,7 @@ class VecVAEStack(gym.Env):
                 q.appendleft([0]*self.v.latent_dim)
 
     def _process(self, obs):
-        mus, _ = self.v.encode(obs)
+        mus, _ = self.v.encode(obs, self.norm_fac)
         for i in range(self.num_envs):
             self.queues[i].appendleft(mus[i].copy())
 
