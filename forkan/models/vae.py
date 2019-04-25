@@ -201,6 +201,10 @@ class VAE(object):
 
         return batch
 
+    def reconstruct(self, batch):
+        """ returns reconstructions from batch of frames """
+        return self.decode(self.encode_and_sample(batch)[-1])
+
     def encode(self, batch):
         """ encodes frame(s) """
 
