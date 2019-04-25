@@ -186,7 +186,7 @@ class VAE(object):
         if norm_fac is not None:
             batch = batch * norm_fac
 
-        assert np.max(batch) <= 1, f'normalise input first!, max is {np.max(batch)}'
+        assert np.max(batch) <= 1, f'normalise input first!, max is {np.max(batch)}, norm_fac {norm_fac}'
 
         if len(batch.shape) != 4:
             """ completing batch shape if some dimesions are missing """
