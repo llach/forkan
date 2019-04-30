@@ -24,7 +24,7 @@ class RetrainVAE(object):
         self.beta = beta
         self.k = k
 
-        self.savepath = f'{rlpath}/vae/'
+        self.savepath = f'{rlpath}/vae/'.replace('//', '/')
         create_dir(self.savepath)
 
         self.log.info('storing files under {}'.format(self.savepath))
@@ -99,11 +99,12 @@ class RetrainVAE(object):
 
     def save(self, suffix='weights'):
         """ Saves current weights """
-        self.log.info('saving weights')
+        self.log.info(f'saving weights to {suffix}')
         self.saver.save(self.s, f'{self.savepath}{suffix}')
 
     def load(self, suffix='weights'):
         """ Saves weights from suffix """
+        self.log.info(f'loading weights from {suffix}')
         self.saver.restore(self.s, f'{self.savepath}{suffix}')
 
     def _load_base_weights(self):
@@ -165,6 +166,13 @@ class RetrainVAE(object):
         batch = self._preprocess_batch(batch)
         batch = np.expand_dims(batch, 1)
         return self.s.run([self.mus[0], self.logvars[0]], feed_dict={self.X: batch})
+
+    def reconstruct(self, batch):
+        """ create reconstructions of frame(s) """
+
+        batch = self._preprocess_batch(batch)
+        batch = np.expand_dims(batch, 1)
+        return np.asarray(self.s.run(self.Xhat[0], feed_dict={self.X: batch}), dtype=np.float64)
 
     def train(self, dataset, batch_size=155, num_episodes=50, print_freq=5):
         import numpy as np
