@@ -27,7 +27,7 @@ class VecVAEStack(gym.Env):
         self.k = k
         self.norm_fac = norm_fac
 
-        self.v = VAE(load_from=load_from, network=vae_network)
+        self.v = VAE(load_from=load_from, network=vae_network, with_opt=False)
 
         self.action_space = env.action_space
         self.observation_space = spaces.Box(low=-2, high=2, shape=(self.k*self.v.latent_dim, ), dtype=np.float32)
