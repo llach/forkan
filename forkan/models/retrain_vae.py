@@ -12,11 +12,12 @@ from forkan.models.vae_networks import build_network
 class RetrainVAE(object):
 
     def __init__(self, rlpath, input_shape, network='pendulum', latent_dim=20, beta=1.0, k=5,
-                 init_from=None, with_attrs=False, sess=None):
+                 init_from=None, with_attrs=False, sess=None, scaled_re_loss=True):
 
         self.log = logging.getLogger('vae')
 
         self.input_shape = (None, ) + input_shape
+        self.scaled_re_loss = scaled_re_loss
         self.latent_dim = latent_dim
         self.with_attrs = with_attrs
         self.init_from = init_from
@@ -76,14 +77,19 @@ class RetrainVAE(object):
         # Reconstruction loss
         rels = []
         for i in range(self.k):
-            rels.append(K.binary_crossentropy(K.flatten(self.X[:, i, ...]), K.flatten(self.Xhat[i])) * (self.input_shape[1] ** 2))
-        self.re_loss = tf.reduce_mean(rels, axis=0)
+            from tensorflow.contrib.layers import flatten
+            inp, outp = flatten(self.X[:, i, ...]), flatten(self.Xhat[i])
+            xent = K.binary_crossentropy(inp, outp)
+            if self.scaled_re_loss:
+                xent *= (self.input_shape[1] ** 2)
+            rels.append(xent)
+        self.re_loss = tf.reduce_mean(tf.stack(rels), axis=0)
 
         # define kullback leibler divergence
         kls = []
         for i in range(self.k):
             kls.append(-0.5 * K.mean((1 + self.logvars[i] - K.square(self.mus[i]) - K.exp(self.logvars[i])), axis=0))
-        self.kl_loss = tf.reduce_mean(kls, axis=0)
+        self.kl_loss = tf.reduce_mean(tf.stack(kls), axis=0)
 
         self.vae_loss = K.mean(self.re_loss + self.beta * K.sum(self.kl_loss))
 
