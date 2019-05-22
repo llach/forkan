@@ -180,6 +180,11 @@ class RetrainVAE(object):
         batch = np.expand_dims(batch, 1)
         return np.asarray(self.s.run(self.Xhat[0], feed_dict={self.X: batch}), dtype=np.float64)
 
+    def reconstruct_stacked(self, batch):
+        """ create reconstructions of frame(s) """
+
+        return np.asarray(self.s.run(self.Xhat[0], feed_dict={self.X: batch}), dtype=np.float64)
+
     def train(self, dataset, batch_size=155, num_episodes=50, print_freq=5):
         import numpy as np
         import time
