@@ -221,6 +221,19 @@ class RetrainVAE(object):
 
         self.s.run(tf.global_variables_initializer())
 
+        du = []
+
+        for _ in range(5):
+            a = np.linspace(0, 1, 64)
+            ar = np.repeat(a, 64, 0).reshape([64, 64])
+            du.append(ar)
+        print(np.asarray(du).shape)
+        du = np.reshape(du, [1, 5, 64, 64, 1])
+
+        file_writer = tf.summary.FileWriter('/Users/llach/board_test')
+        im_ph = tf.placeholder(tf.float32, shape=(1, 64, 128, 1))
+        im_sum = tf.summary.image('img', im_ph)
+
         # rollout N episodes
         for ep in range(num_episodes):
 
@@ -285,16 +298,29 @@ class RetrainVAE(object):
                     ])
 
                     print('\n{}'.format(tab))
-            self.save()
 
+                reca = self.reconstruct_stacked(du)
+                print(reca[0].shape, ar.shape)
+                fin = np.concatenate((reca[0], np.expand_dims(ar, axis=-1)), axis=1)
+                isu = self.s.run(im_sum, feed_dict={im_ph: np.expand_dims(fin, axis=0)})
+                file_writer.add_summary(isu, nb)
+                file_writer.flush()
+            self.save()
+        file_writer.close()
         self.save()
         print('training done!')
 
 if __name__ == '__main__':
     from forkan import model_path
-    from forkan.datasets import load_uniform_pendulum
 
-    data = load_uniform_pendulum().reshape(6000, 5, 64, 64, 1)
+    FRAMES = 128
+    data = []
+
+    for _ in range(FRAMES*5):
+        a = np.linspace(0, 1, 64)
+        ar = np.repeat(a, 64, 0).reshape([64, 64])
+        data.append(ar)
+    data = np.reshape(data, [FRAMES, 5, 64, 64, 1])
 
     v = RetrainVAE(f'{model_path}/retrain/', (64, 64, 1), network='pendulum-mini', beta=84, latent_dim=5, sess=tf.Session())
-    v.train(data, batch_size=128)
+    v.train(data, batch_size=2, num_episodes=5)
