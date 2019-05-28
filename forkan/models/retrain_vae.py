@@ -310,6 +310,69 @@ class RetrainVAE(object):
         self.save()
         print('training done!')
 
+
+    def train_on_buffer(self, buffer, batch_size=128, num_episodes=10, print_freq=2):
+        import numpy as np
+        import time
+
+        # we need statistics that are returned, maybe pass down fw
+
+        from tabulate import tabulate
+
+        dataset = buffer._storage
+        num_samples = len(dataset)
+        tstart = time.time()
+        nb = 1
+
+        self.log.info('Training VAE on {} samples for {} episodes.'.format(num_samples, num_episodes))
+
+        # rollout N episodes
+        for ep in range(num_episodes):
+
+            # shuffle dataset
+            np.random.shuffle(dataset)
+
+            for n, idx in enumerate(np.arange(0, num_samples, batch_size)):
+                bps = max(int(nb / (time.time() - tstart)), 1)
+                x = dataset[idx:min(idx+batch_size, num_samples), ...]
+
+                _, loss, re_loss, kl_losses = self.s.run([train_op, self.vae_loss, self.re_loss, self.kl_loss],
+                                                          feed_dict={self.X: x})
+
+                # mean losses
+                re_loss = np.mean(re_loss)
+                kl_loss = self.beta * np.sum(kl_losses)
+
+                # increase batch counter
+                nb += 1
+
+                if n % print_freq == 0 and print_freq is not -1:
+                    total_batches = (num_samples // batch_size) * num_episodes
+
+                    perc = ((nb) / total_batches) * 100
+                    steps2go = total_batches - nb
+                    secs2go = steps2go / bps
+                    min2go = secs2go / 60
+
+                    hrs = int(min2go // 60)
+                    mins = int(min2go) % 60
+
+                    tab = tabulate([
+                        ['name', f'retrainvae-clean-b{self.beta}'],
+                        ['episode', ep],
+                        ['batch', n],
+                        ['bps', bps],
+                        ['rec-loss', re_loss],
+                        ['kl-loss', kl_loss],
+                        ['ETA', '{}h {}min'.format(hrs, mins)],
+                        ['done', '{}%'.format(int(perc))],
+                    ])
+
+                    print('\n{}'.format(tab))
+        self.save()
+        print('buffer training done!')
+
+
 if __name__ == '__main__':
     from forkan import model_path
 
