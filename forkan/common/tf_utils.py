@@ -88,4 +88,4 @@ def scalar_summary(name, var, scope='scalars'):
     """ Adds scalar Tensor to TensorBoard visualization under scope. """
 
     with tf.name_scope('{}/{}'.format(scope, name)):
-        tf.summary.scalar(name, var)
+        return tf.summary.scalar(name, var)
