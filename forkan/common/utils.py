@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
 from keras.utils import to_categorical
+from scipy.ndimage import measurements
 
 from forkan import model_path
 
@@ -59,6 +60,38 @@ def textcolor(text, color='green'):
     else:
         logger.warning('color {} no known. not modifying.'.format(color))
         return text
+
+
+def ball_pos_from_rgb(fimg):
+    m = [200, 72, 72]
+
+    red_pxls = np.all(fimg == m, axis=-1)
+    non_red_pxls = np.any(fimg != m, axis=-1)
+
+    fimg[red_pxls] = [200, 72, 72]
+    fimg[non_red_pxls] = [0, 0, 0]
+
+    lw, num = measurements.label(red_pxls)
+    area = measurements.sum(red_pxls, lw, index=np.arange(lw.max() + 1))
+    possible_idxs = np.where(area == 8.)[0]
+
+    if possible_idxs:
+        lw = np.expand_dims(lw, axis=-1)
+
+        ball_idx = possible_idxs[0]
+        ball_pxls = np.all(lw == [ball_idx], axis=-1)
+        non_ball_pxls = np.any(lw != [ball_idx], axis=-1)
+
+        fimg[ball_pxls] = [200, 72, 72]
+        fimg[non_ball_pxls] = [0, 0, 0]
+
+        ball_locations = np.unique(np.where(fimg[..., 0] == 200), axis=1)
+        ball_pos = [np.mean(np.unique(ball_locations[0])), np.mean(np.unique(ball_locations[1]))]
+    else:
+        fimg = np.zeros_like(fimg)
+        ball_pos = [0, 0]
+
+    return ball_pos, fimg
 
 
 def print_dict(d, lo=None):
