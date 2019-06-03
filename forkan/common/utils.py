@@ -96,7 +96,7 @@ def ball_pos_from_rgb(fimg):
         assert np.all(ball_pos <= 1.0)
     else:
         fimg = np.zeros_like(fimg)
-        ball_pos = [0, 0]
+        ball_pos = np.asarray([0., 0.], dtype=np.float32)
 
     return ball_pos, fimg
 
