@@ -63,17 +63,23 @@ def textcolor(text, color='green'):
 
 
 def ball_pos_from_rgb(fimg):
-    m = [200, 72, 72]
 
-    red_pxls = np.all(fimg == m, axis=-1)
-    non_red_pxls = np.any(fimg != m, axis=-1)
+    assert len(fimg.shape) == 3, f'fimg.shape is not a valid image shape'
+    assert fimg.shape[-1] == 3, 'frame needs to be rgb'
 
-    fimg[red_pxls] = [200, 72, 72]
-    fimg[non_red_pxls] = [0, 0, 0]
+    fimg = fimg.copy()
 
-    lw, num = measurements.label(red_pxls)
-    area = measurements.sum(red_pxls, lw, index=np.arange(lw.max() + 1))
-    possible_idxs = np.where(area == 8.)[0]
+    # finding clusters in one channel is sufficient
+    lw, num = measurements.label(fimg[..., 0])
+    area = measurements.sum(fimg[..., 0], lw, index=np.arange(lw.max() + 1))
+
+    # the ball can change color and size
+    # mostly, it is the smalles cluster with at least one member
+    min_area = np.min(area[area!=0.])
+
+    # introducing an upper bound avoids calculating the position of non-ball clusters when the ball is not visible
+    min_area = min_area if min_area < 2000. else -1.0
+    possible_idxs = np.where(area == min_area)[0]
 
     if possible_idxs:
         lw = np.expand_dims(lw, axis=-1)
@@ -86,7 +92,8 @@ def ball_pos_from_rgb(fimg):
         fimg[non_ball_pxls] = [0, 0, 0]
 
         ball_locations = np.unique(np.where(fimg[..., 0] == 200), axis=1)
-        ball_pos = [np.mean(np.unique(ball_locations[0])), np.mean(np.unique(ball_locations[1]))]
+        ball_pos = np.asarray([np.mean(np.unique(ball_locations[0])) / 210, np.mean(np.unique(ball_locations[1])) / 160])
+        assert np.all(ball_pos <= 1.0)
     else:
         fimg = np.zeros_like(fimg)
         ball_pos = [0, 0]
