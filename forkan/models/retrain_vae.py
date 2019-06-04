@@ -173,6 +173,11 @@ class RetrainVAE(object):
         batch = np.expand_dims(batch, 1)
         return self.s.run([self.mus[0], self.logvars[0]], feed_dict={self.X: batch})
 
+    def decode(self, mus, logvs):
+        """ decode latents """
+
+        return self.s.run([self.Xhat[0]], feed_dict={self.mus[0]: mus, self.logvars[0]: logvs})
+
     def reconstruct(self, batch):
         """ create reconstructions of frame(s) """
 
@@ -309,7 +314,6 @@ class RetrainVAE(object):
         file_writer.close()
         self.save()
         print('training done!')
-
 
     def train_on_buffer(self, buffer, batch_size=128, num_episodes=10, print_freq=2):
         import numpy as np
