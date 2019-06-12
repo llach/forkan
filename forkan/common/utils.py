@@ -62,6 +62,63 @@ def textcolor(text, color='green'):
         return text
 
 
+def setup_plotting():
+    import matplotlib as mpl
+    import seaborn as sns; sns.set()
+
+    # Set theme
+    sns.set_style('whitegrid')
+
+    nice_fonts = {
+        # Use LaTex to write all text
+        "text.usetex": True,
+        "font.family": "serif",
+        "font.serif": "Palatino",
+        # Use 10pt font in plots, to match 10pt font in document
+        "axes.labelsize": 10,
+        "font.size": 10,
+        # Make the legend/label fonts a little smaller
+        "legend.fontsize": 8,
+        "xtick.labelsize": 8,
+        "ytick.labelsize": 8,
+    }
+
+    mpl.rcParams.update(nice_fonts)
+
+
+def get_figure_size(width=404, fraction=1):
+    """ Set aesthetic figure dimensions to avoid scaling in latex.
+
+    Parameters
+    ----------
+    width: float
+            Width in pts
+    fraction: float
+            Fraction of the width which you wish the figure to occupy
+
+    Returns
+    -------
+    fig_dim: tuple
+            Dimensions of figure in inches
+    """
+    # Width of figure
+    fig_width_pt = width * fraction
+
+    # Convert from pt to inches
+    inches_per_pt = 1 / 72.27
+
+    # Golden ratio to set aesthetic figure height
+    golden_ratio = (5**.5 - 1) / 2
+
+    # Figure width in inches
+    fig_width_in = fig_width_pt * inches_per_pt
+    # Figure height in inches
+    fig_height_in = fig_width_in * golden_ratio
+
+    fig_dim = (fig_width_in, fig_height_in)
+
+    return fig_dim
+
 def ball_pos_from_rgb(fimg):
 
     assert len(fimg.shape) == 3, f'fimg.shape is not a valid image shape'
@@ -110,7 +167,7 @@ def print_dict(d, lo=None):
 
 
 def log_alg(name, env_id, params, vae=None, num_envs=1, save=True, lr=None, k=None, seed=None, model=None, with_kl=False,
-            rl_coef=None, early_stop=False, target_kl=None, scaled_re_loss=True, alpha=None):
+            rl_coef=None, early_stop=False, target_kl=None, scaled_re_loss=True, alpha=None, latents=None):
     params.update({'nenvs': num_envs})
 
     print_dict(params)
@@ -133,6 +190,9 @@ def log_alg(name, env_id, params, vae=None, num_envs=1, save=True, lr=None, k=No
 
     if k is not None and not callable(k):
         savename = '{}-k{}'.format(savename, k)
+
+    if latents is not None and not callable(latents):
+        savename = '{}-lathid{}'.format(savename, latents)
 
     if not scaled_re_loss:
         savename = f'{savename}-NOscaledV'
