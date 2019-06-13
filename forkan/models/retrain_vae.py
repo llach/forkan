@@ -169,9 +169,10 @@ class RetrainVAE(object):
     def encode(self, batch):
         """ encodes frame(s) """
 
-        batch = self._preprocess_batch(batch)
-        batch = np.expand_dims(batch, 1)
-        return self.s.run([self.mus[0], self.logvars[0]], feed_dict={self.X: batch})
+        if len(batch.shape) != 5:
+            batch = self._preprocess_batch(batch)
+            batch = np.expand_dims(batch, 1)
+        return self.s.run([self.mus, self.logvars], feed_dict={self.X: batch})
 
     def decode(self, mus, logvs):
         """ decode latents """
