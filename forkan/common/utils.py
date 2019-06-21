@@ -62,7 +62,7 @@ def textcolor(text, color='green'):
         return text
 
 
-def setup_plotting():
+def setup_plotting(pl_type='pendulum'):
     import matplotlib as mpl
     import seaborn as sns; sns.set()
 
@@ -74,16 +74,19 @@ def setup_plotting():
         "text.usetex": True,
         "font.family": "serif",
         "font.serif": "Palatino",
-        # Use 10pt font in plots, to match 10pt font in document
-        "axes.labelsize": 10,
-        "font.size": 10,
+        # Use 11pt font in plots, to match  font in document
+        "axes.labelsize": 11,
+        "font.size": 11,
         # Make the legend/label fonts a little smaller
-        "legend.fontsize": 8,
-        "xtick.labelsize": 8,
-        "ytick.labelsize": 8,
+        "legend.fontsize": 9,
+        "xtick.labelsize": 9,
+        "ytick.labelsize": 9,
     }
 
     mpl.rcParams.update(nice_fonts)
+
+    if pl_type == 'pendulum':
+        return {'bottom': -1500, 'top': -100}, [[0, 2e6, 4e6, 6e6, 8e6, 10e6], ['0', '2M', '4M', '6M', '8M', '10M']]
 
 
 def get_figure_size(width=404, fraction=1):
