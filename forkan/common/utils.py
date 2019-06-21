@@ -5,6 +5,7 @@ import inspect
 import json
 import logging
 import math
+import csv
 import os
 import shutil
 from shutil import rmtree
@@ -60,6 +61,44 @@ def textcolor(text, color='green'):
     else:
         logger.warning('color {} no known. not modifying.'.format(color))
         return text
+
+
+def read_keys(_dir, _filter, column_names):
+
+    data = {}
+    for cn in column_names:
+        data.update({cn: []})
+
+    dirs = ls_dir(_dir)
+    for d in dirs:
+        model_name = d.split('/')[-1]
+        run_data = {}
+        for cn in column_names:
+            run_data.update({cn: []})
+
+        if _filter is not None and not '':
+            if _filter not in model_name:
+                logger.info(f'skipping {model_name} | no match with {_filter}')
+                continue
+
+        if not os.path.isfile('{}/progress.csv'.format(d)):
+            logger.info('skipping {} | file not found'.format(model_name))
+            continue
+
+        dic = csv.DictReader(open(f'{d}/progress.csv'))
+        for cn in column_names:
+            assert cn in dic.fieldnames, f'{cn} not in {dic.fieldnames}'
+
+        for row in dic:
+            for cn in column_names:
+                run_data[cn].append(row[cn])
+
+        for cn in column_names:
+            data[cn].append(run_data[cn])
+
+    for cn in column_names:
+        data[cn] = np.asarray(data[cn], dtype=np.float32)
+    return data
 
 
 def setup_plotting(pl_type='pendulum'):
