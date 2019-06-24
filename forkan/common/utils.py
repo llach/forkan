@@ -126,6 +126,8 @@ def setup_plotting(pl_type='pendulum'):
 
     if pl_type == 'pendulum':
         return {'bottom': -1500, 'top': -100}, [[0, 2e6, 4e6, 6e6, 8e6, 10e6], ['0', '2M', '4M', '6M', '8M', '10M']]
+    elif pl_type == 'break-baseline':
+        return {},  [[0, 2e6, 4e6, 6e6, 8e6, 10e6], ['0', '2M', '4M', '6M', '8M', '10M']]
 
 
 def get_figure_size(width=404, fraction=1):
