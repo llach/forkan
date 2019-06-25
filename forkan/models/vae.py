@@ -95,11 +95,12 @@ class VAE(object):
         # Reconstruction loss
         self.re_loss = K.binary_crossentropy(K.flatten(self._input), K.flatten(self._output))
         self.re_loss *= self.input_shape[1] ** 2  # dont square, use correct dims
+        self.re_loss += self.zeta
 
         # define kullback leibler divergence
         self.kl_loss = 1 + self.logvars - K.square(self.mus) - K.exp(self.logvars)
         self.kl_loss = -0.5 * K.mean(self.kl_loss, axis=0)
-        self.vae_loss = K.mean(self.zeta * self.re_loss + self.beta * K.sum(self.kl_loss))
+        self.vae_loss = K.mean(self.re_loss + self.beta * K.sum(self.kl_loss))
 
         # create optimizer
         if with_opt:
