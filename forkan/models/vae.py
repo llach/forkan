@@ -175,7 +175,9 @@ class VAE(object):
 
         self.merge_op = tf.summary.merge_all()
 
-        self.writer = tf.summary.FileWriter(f'/Users/llach/vae/{self.savename}',
+        import os; home=os.environ['HOME']
+
+        self.writer = tf.summary.FileWriter(f'{home}/vae/{self.savename}',
                                             graph=tf.get_default_graph())
             
     def _preprocess_batch(self, batch, norm_fac=None):
