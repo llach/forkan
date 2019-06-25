@@ -17,7 +17,7 @@ from forkan.models.vae_networks import build_network, build_encoder
 
 class VAE(object):
 
-    def __init__(self, input_shape=None, name='default', network='atari', latent_dim=20, beta=1.0, lr=1e-4,
+    def __init__(self, input_shape=None, name='default', network='atari', latent_dim=20, beta=1.0, lr=1e-4, zeta=1.0,
                  load_from=None, session=None, optimizer=tf.train.AdamOptimizer, with_opt=True, tensorboard=False):
 
         if input_shape is None:
@@ -35,12 +35,13 @@ class VAE(object):
             self.network = network
             self.beta = beta
             self.name = name
+            self.zeta = zeta
             self.lr = lr
 
             # add batch dim
             self.input_shape = (None,) + input_shape
 
-            self.savename = '{}-b{}-lat{}-lr{}-{}'.format(name, beta, latent_dim, lr,
+            self.savename = '{}-b{}-z{}-lat{}-lr{}-{}'.format(name, beta, zeta, latent_dim, lr,
                                                           datetime.datetime.now().strftime('%Y-%m-%dT%H:%M'))
             self.parent_dir = '{}vae-{}'.format(model_path, network)
             self.savepath = '{}vae-{}/{}/'.format(model_path, network, self.savename)
@@ -159,25 +160,22 @@ class VAE(object):
         scalar_summary('batches-per-second', self.bps_ph)
         scalar_summary('episode', self.ep_ph)
 
-        mu_mean = tf.reduce_mean(self.mus, axis=0)
-        vars_mean = tf.reduce_mean(tf.exp(0.5 * self.logvars), axis=0)
+        self.v_loss = tf.placeholder(tf.float32, (), name='vae-loss')
+        self.rel_ph = tf.placeholder(tf.float32, (), name='rec-loss')
+        self.kll_ph = tf.placeholder(tf.float32, (), name='kl-loss')
+        self.klls_ph = [tf.placeholder(tf.float32, (), name=f'z{i}-kl') for i in range(self.latent_dim)]
 
         with tf.variable_scope('loss'):
-            scalar_summary('reconstruction-loss', self.re_loss)
+            scalar_summary('reconstruction-loss', self.rel_ph)
             scalar_summary('total-loss', self.vae_loss)
-            scalar_summary('kl-loss', self.kl_loss)
+            scalar_summary('kl-loss', self.kll_ph)
 
-        with tf.variable_scope('zj_mu'):
-            for i in range(self.latent_dim):
-                scalar_summary('z{}-mu'.format(i), mu_mean[i])
-
-        with tf.variable_scope('zj_var'):
-            for i in range(self.latent_dim):
-                scalar_summary('z{}-var'.format(i), vars_mean[i])
+        for i in range(self.latent_dim):
+            scalar_summary(f'z{i}-kl', self.klls_ph[i], scope='z-kl')
 
         self.merge_op = tf.summary.merge_all()
 
-        self.writer = tf.summary.FileWriter('/Users/llach/vae',
+        self.writer = tf.summary.FileWriter(f'/Users/llach/vae/{self.savename}',
                                             graph=tf.get_default_graph())
             
     def _preprocess_batch(self, batch, norm_fac=None):
@@ -243,6 +241,9 @@ class VAE(object):
         tstart = time.time()
         nb = 1
 
+        im_ph = tf.placeholder(tf.float32, shape=np.multiply((1,) + self.input_shape[1:], [1,3,2,1]))
+        im_sum = tf.summary.image('img', im_ph)
+
         # rollout N episodes
         for ep in range(num_episodes):
 
@@ -252,21 +253,29 @@ class VAE(object):
             for n, idx in enumerate(np.arange(0, num_samples, batch_size)):
                 bps = max(int(nb / (time.time() - tstart)), 1)
                 x = dataset[idx:min(idx+batch_size, num_samples), ...]
-                if self.tb:
-                    _, suma, loss, re_loss, kl_losses = self.s.run([self.train_op, self.merge_op, self.vae_loss,
-                                                                  self.re_loss, self.kl_loss],
-                                                                 feed_dict={self._input: x,
-                                                                            self.bps_ph: bps,
-                                                                            self.ep_ph: ep
-                                                                            })
-                    self.writer.add_summary(suma, nb)
-                else:
-                    _, loss, re_loss, kl_losses = self.s.run([self.train_op, self.vae_loss, self.re_loss, self.kl_loss],
-                                                           feed_dict={self._input: x})
+
+                _, loss, re_loss, kl_losses = self.s.run([self.train_op, self.vae_loss, self.re_loss, self.kl_loss],
+                                                         feed_dict={self._input: x})
 
                 # mean losses
                 re_loss = np.mean(re_loss)
                 kl_loss = self.beta * np.sum(kl_losses)
+
+                if self.tb:
+                    fd = {
+                          self._input: x,
+                          self.rel_ph: re_loss,
+                          self.kll_ph: kl_loss,
+                          self.bps_ph: bps,
+                          self.ep_ph: ep,
+                          }
+
+                    for i, kph in enumerate(self.klls_ph):
+                        fd.update({kph: kl_losses[i]})
+
+                    suma = self.s.run(self.merge_op, feed_dict=fd)
+
+                    self.writer.add_summary(suma, nb)
 
                 # increase batch counter
                 nb += 1
@@ -282,9 +291,20 @@ class VAE(object):
 
                 if n % print_freq == 0 and print_freq is not -1:
 
+                    if self.tb:
+                        du = x[np.random.choice(x.shape[0], 3)]
+                        reca = self.reconstruct(du)
+                        hori = []
+                        for o in range(3):
+                            hori.append(np.concatenate((du[o], reca[o]), axis=1))
+                        fin = np.concatenate(hori, axis=0)
+                        isu = self.s.run(im_sum, feed_dict={im_ph: np.expand_dims(fin, axis=0)})
+                        self.writer.add_summary(isu, nb)
+                        self.writer.flush()
+
                     total_batches = (num_samples // batch_size) * num_episodes
 
-                    perc = ((nb) / total_batches) * 100
+                    perc = ((nb) / max(total_batches, 1)) * 100
                     steps2go = total_batches - nb
                     secs2go = steps2go / bps
                     min2go = secs2go / 60
@@ -321,25 +341,13 @@ class VAE(object):
 
 
 if __name__ == '__main__':
-    from forkan.datasets import load_uniform_pendulum
-    data = load_uniform_pendulum()
-    v = VAE(data.shape[1:], name='test', network='pendulum', beta=30.1, latent_dim=5, tensorboard=True)
+    from forkan.datasets import load_set
+    data = load_set('breakout-normalized-small')
+    for z in [1, 30, 60]:
+        v = VAE(data.shape[1:], name='test', network='atari', beta=1, latent_dim=20, zeta=z, tensorboard=True)
+        v.train(data, num_episodes=1, print_freq=1)
+        tf.reset_default_graph()
 
-    en_ints = [tf.placeholder(tf.float32, shape=(None, 64, 64, 1)) for _ in range(2)]
-    mus = v.stack_encoder(en_ints)
-    randi = np.random.normal(0, 1, (1, 64, 64, 1))
 
-    combined_out = tf.concat(mus, axis=1)
-    with tf.Session() as s:
-        s.run(tf.global_variables_initializer())
-        print(s.run(mus, feed_dict={en_ints[0]: randi,
-                                    en_ints[1]: randi}))
-
-    v._save()
-    v._save('retrain')
-
-    writer = tf.summary.FileWriter('/Users/llach/vae',
-                                        graph=tf.get_default_graph())
-    # v.train(data[:160], num_episodes=5, print_freq=20)
 
 

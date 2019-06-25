@@ -215,7 +215,7 @@ class RetrainVAE(object):
         csv = CSVLogger('{}/progress.csv'.format(self.savepath), *csv_header)
 
         rel_ph = tf.placeholder(tf.float32, (), name='rec-loss')
-        kll_ph = tf.placeholder(tf.float32, (), name='rec-loss')
+        kll_ph = tf.placeholder(tf.float32, (), name='kl-loss')
         klls_ph = [tf.placeholder(tf.float32, (), name=f'z{i}-kl') for i in range(self.latent_dim)]
 
         scalar_summary('reconstruction-loss', rel_ph, scope='vae-loss')
@@ -317,6 +317,7 @@ class RetrainVAE(object):
         print('training done!')
 
     def train_on_buffer(self, buffer, batch_size=128, num_episodes=10, print_freq=2):
+        ''' dont use this, buffer ppo is discontinued for now '''
         import numpy as np
         import time
 
