@@ -77,7 +77,9 @@ def read_keys(_dir, _filter, column_names):
             run_data.update({cn: []})
 
         if _filter is not None and not '':
-            if _filter not in model_name:
+            if type(_filter) == str:
+                _filter = [_filter]
+            if not all(sub in model_name for sub in _filter):
                 logger.info(f'skipping {model_name} | no match with {_filter}')
                 continue
 
@@ -123,6 +125,7 @@ def setup_plotting(pl_type='pendulum'):
     }
 
     mpl.rcParams.update(nice_fonts)
+    mpl.rcParams['text.latex.preamble'] = [r'\usepackage{amsmath}']
 
     if pl_type == 'pendulum':
         return {'bottom': -1500, 'top': -100}, [[0, 2e6, 4e6, 6e6, 8e6, 10e6], ['0', '2M', '4M', '6M', '8M', '10M']]
