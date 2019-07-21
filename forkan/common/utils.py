@@ -128,9 +128,9 @@ def setup_plotting(pl_type='pendulum'):
     mpl.rcParams['text.latex.preamble'] = [r'\usepackage{amsmath}']
 
     if pl_type == 'pendulum':
-        return {'bottom': -1500, 'top': -100}, [[0, 2e6, 4e6, 6e6, 8e6, 10e6], ['0', '2M', '4M', '6M', '8M', '10M']]
+        return {'bottom': -1500, 'top': -100}, [[0, 2e6, 4e6, 6e6, 8e6, 10e6], ['$0$', '$2\\times 10^6$', '$4\\times 10^6$', '$6\\times 10^6$', '$8\\times 10^6$', '$10\\times 10^6$']]
     elif pl_type == 'break-baseline':
-        return {},  [[0, 2e6, 4e6, 6e6, 8e6, 10e6], ['0', '2M', '4M', '6M', '8M', '10M']]
+        return {},  [[0, 2e6, 4e6, 6e6, 8e6, 10e6],  ['$0$', '$2\\times 10^6$', '$4\\times 10^6$', '$6\\times 10^6$', '$8\\times 10^6$', '$10\\times 10^6$']]
 
 
 def get_figure_size(width=404, fraction=1):
